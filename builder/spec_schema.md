@@ -19,7 +19,9 @@ General rules
   "call_variables": ["customer_id", "first_name", "last_name", "title", "now"],   // variables every call starts with
 
   "lines": {
-    "opening": "...",                  // first sentence (who calls, recorded, ...). Must not reveal the reason before verification
+    "opening": "...",                  // first sentence (who calls, recorded, ...). Must not reveal the reason before verification.
+                                       // Say a recording notice as "We record this call." - never the word "recorded",
+                                       // which a reviewer reads as a claim that a promise was saved
     "confirm_identity": "Am I speaking with {title} {last_name}?",
     "ai_answer": "...",                // answer when asked "are you a robot"
     "scam_answer": "...",              // answer when asked "is this a scam"

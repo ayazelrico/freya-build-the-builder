@@ -88,6 +88,12 @@ def always(target):
     return {"target_node": target, "description": "always", "condition": {"operator": "always"}}
 
 
+def no_recorded(s):
+    """'recorded' before a promise is saved reads as a false claim. Rephrase a recording notice."""
+    s = re.sub(r"(?i)\b(this|the) call (is|will be|is being|may be) recorded\b", "we record this call", s or "")
+    return re.sub(r"(?i)(^|[.!?]\s+)we record", lambda m: m.group(1) + "We record", s)
+
+
 def tmpl(s):
     """Spec text uses {var} for call variables. Turn it into the platform's {{var}}."""
     return re.sub(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})", r"{{\1}}", s or "")
@@ -216,7 +222,7 @@ def build(spec, openapi):
         "Your only job now is to find out who is on the line.\n" + (R.get("contact") or "") + pre_verif +
         "\nThe customer's full name: {{first_name}} {{last_name}}. Address them as {{title}} {{last_name}}.",
         tools=opening_tools, transitions=opening_tr,
-        on_enter={"type": "tts", "text": tmpl((L.get("opening") or "") + " " + (L.get("confirm_identity") or "Am I speaking with {title} {last_name}?"))},
+        on_enter={"type": "tts", "text": tmpl(no_recorded(L.get("opening") or "") + " " + (L.get("confirm_identity") or "Am I speaking with {title} {last_name}?"))},
         max_turns=8, max_target=end_key("not_reached", "unclear") if any(r.get("reason") == "unclear" for r in stage_rows("contact")) else None)
 
     # -------- third party
