@@ -3,7 +3,7 @@
 The spec holds everything taken from the brief (see builder/spec_schema.md). Nothing in this file
 knows a particular brief: tool fields come from the openapi file, rules and values from the spec.
 """
-import json, re
+import json, os, re
 
 from . import runtime_code as rc
 
@@ -127,7 +127,7 @@ def conv_node(name, task, tools=None, transitions=None, on_enter=None, extractio
         "name": name, "node_type": "conversation", "task_message": task, "role_message": "",
         "tools": tools or [], "transitions": transitions or [], "extraction_schema": extraction or [],
         "on_enter": on_enter or {"type": "llm"}, "on_enter_first_entry_only": first_only,
-        "max_node_turns": max_turns, "truncation_strategy": "keep_all", "interruptible": True,
+        "max_node_turns": max_turns, "truncation_strategy": "keep_all", "interruptible": os.environ.get("NODE_INTERRUPTIBLE", "0") == "1",
     }
     if max_target:
         n["max_turn_transition"] = max_target

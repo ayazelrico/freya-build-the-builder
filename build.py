@@ -27,6 +27,8 @@ def tune_agent_config(workflow_id, spec, trace):
         ac = w.get("agent_config") or {}
         tts = ac.setdefault("ttsConfig", {}); stt = ac.setdefault("sttConfig", {})
         tts.setdefault("startSpeakingPlan", {})["waitSeconds"] = wait
+        if os.environ.get("SMART_TURN", "0") in ("0", "1"):
+            stt.setdefault("additionalSettings", {})["smartTurnEnabled"] = os.environ.get("SMART_TURN", "0") == "1"
         lang = LANG_CODES.get(str(spec.get("language") or "English").strip().lower())
         if lang:
             tts["language"] = lang; stt["language"] = lang
