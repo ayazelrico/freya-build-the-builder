@@ -213,7 +213,7 @@ def build(spec, openapi):
         "If they correct themselves ('the 21st, sorry, the 20th'), use only the corrected value. Amounts and dates said in words count like digits. "
         "If they ask a question back or talk about something else, answer briefly and return to your question. "
         "A date they mention that is not about paying (a wedding, a birthday) is not a payment date.\n"
-        "If the customer's message is cut off mid-sentence, it is not an answer: reply only 'Sorry, please go on.' and wait. "
+        "If the customer's message is cut off mid-sentence or is only small talk, it is not an answer: repeat your current question in at most eight words (for example 'And the last four digits?') and nothing else. "
         "A cut-off or off-topic message is never a refusal, a decline or a non-answer, and never uses up an attempt or an ask.\n"
         "Small talk: acknowledge it in at most three words, never ask about it, then repeat your question.\n"
         "Only an explicit no ('no', 'I will not', 'I don't want to') counts as a refusal or a decline.\n"
