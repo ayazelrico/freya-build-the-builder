@@ -57,7 +57,8 @@ def main(spec_path, openapi_path, cases_path, brief):
             res = {"status": "success", "data": {"ok": True, "verified": True, "wrong_answers_left": 2, "all_verified": False}, "header": {}}
             run(vt["post_process_code"], v, result=res); print(res["data"]["what_to_do_next"])
         # finalize for the expected outcome path
-        v2 = dict(v, end_path_outcome=c["expected"]["outcome"], end_path_reason=c["expected"]["reason"] or "")
+        rw = [r for r in spec["outcomes"] if r["outcome"] == c["expected"]["outcome"] and (r.get("reason") or "") == (c["expected"]["reason"] or "")][0]
+        v2 = dict(v, end_path_outcome=rw["outcome"], end_path_reason=rw.get("reason") or "", end_path_role=rw.get("role", "other"))
         if exp: v2["promises_recorded"] = str(len(exp))
         run(node_code(wf, "finalize"), v2); print("close:", v2["close_outcome"], repr(v2["close_reason"]), "|", v2["farewell_text"])
         cfg = {"body": {"customer_id": "c_x", "outcome": v2["close_outcome"], "reason": v2["close_reason"]}}

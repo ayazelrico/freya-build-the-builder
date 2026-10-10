@@ -181,7 +181,8 @@
   "tool": "add_note",
   "product_param": "product_id",
   "reason_param": "reason",
-  "reasons": []
+  "reasons": [],
+  "paid_reason": "paid"
  },
  "transfer": {
   "queue_param": "queue",
@@ -204,97 +205,113 @@
    "outcome": "promise",
    "reason": "",
    "stage": "negotiate",
-   "when": "at least one promise was recorded with create_promise returning ok"
+   "when": "at least one promise was recorded with create_promise returning ok",
+   "role": "promise"
   },
   {
    "outcome": "paid",
    "reason": "",
    "stage": "negotiate",
-   "when": "the customer says they already paid this past-due amount"
+   "when": "the customer says they already paid this past-due amount",
+   "role": "paid"
   },
   {
    "outcome": "transferred",
    "reason": "restructuring",
    "stage": "negotiate",
-   "when": "after transfer_to_agent with queue restructuring"
+   "when": "after transfer_to_agent with queue restructuring",
+   "role": "transferred"
   },
   {
    "outcome": "transferred",
    "reason": "human",
    "stage": "any",
-   "when": "after transfer_to_agent with queue general"
+   "when": "after transfer_to_agent with queue general",
+   "role": "transferred"
   },
   {
    "outcome": "transferred",
    "reason": "support",
    "stage": "negotiate",
-   "when": "after transfer_to_agent with queue support"
+   "when": "after transfer_to_agent with queue support",
+   "role": "transferred"
   },
   {
    "outcome": "no_promise",
    "reason": "refused",
    "stage": "negotiate",
-   "when": "persuasion attempts are used up, or the customer said twice they do not want to talk"
+   "when": "persuasion attempts are used up, or the customer said twice they do not want to talk",
+   "role": "refused"
   },
   {
    "outcome": "no_promise",
    "reason": "hardship",
    "stage": "negotiate",
-   "when": "the customer mentioned illness, a death in the family or job loss and declined the support team"
+   "when": "the customer mentioned illness, a death in the family or job loss and declined the support team",
+   "role": "hardship"
   },
   {
    "outcome": "no_promise",
    "reason": "dispute",
    "stage": "negotiate",
-   "when": "the customer says the debt or product is not theirs, or it was closed or paid off in the past"
+   "when": "the customer says the debt or product is not theirs, or it was closed or paid off in the past",
+   "role": "dispute"
   },
   {
    "outcome": "no_promise",
    "reason": "service_error",
    "stage": "negotiate",
-   "when": "create_promise failed twice"
+   "when": "create_promise failed twice",
+   "role": "service_error"
   },
   {
    "outcome": "not_verified",
    "reason": "failed",
    "stage": "identity",
-   "when": "three wrong security answers"
+   "when": "three wrong security answers",
+   "role": "id_failed"
   },
   {
    "outcome": "not_verified",
    "reason": "declined",
    "stage": "identity",
-   "when": "the customer refused to answer the security questions twice, or asked twice what the call is about instead of answering, or said twice they do not want to talk before verification"
+   "when": "the customer refused to answer the security questions twice, or asked twice what the call is about instead of answering, or said twice they do not want to talk before verification",
+   "role": "id_declined"
   },
   {
    "outcome": "not_reached",
    "reason": "callback",
    "stage": "third_party",
-   "when": "a callback was scheduled with schedule_callback"
+   "when": "a callback was scheduled with schedule_callback",
+   "role": "callback"
   },
   {
    "outcome": "not_reached",
    "reason": "no_callback",
    "stage": "third_party",
-   "when": "the person offered times outside the allowed window twice"
+   "when": "the person offered times outside the allowed window twice",
+   "role": "no_callback"
   },
   {
    "outcome": "not_reached",
    "reason": "wrong_number",
    "stage": "contact",
-   "when": "the number does not belong to the customer"
+   "when": "the number does not belong to the customer",
+   "role": "wrong_number"
   },
   {
    "outcome": "not_reached",
    "reason": "deceased",
    "stage": "contact",
-   "when": "the person says the customer has died"
+   "when": "the person says the customer has died",
+   "role": "deceased"
   },
   {
    "outcome": "not_reached",
    "reason": "unclear",
    "stage": "contact",
-   "when": "after asking twice it is still unclear who is on the line"
+   "when": "after asking twice it is still unclear who is on the line",
+   "role": "unclear"
   }
  ],
  "rules_text": {

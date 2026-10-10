@@ -99,6 +99,14 @@ def tmpl(s):
     return re.sub(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})", r"{{\1}}", s or "")
 
 
+ROLES = ("promise", "paid", "transferred", "refused", "hardship", "dispute", "service_error", "id_failed", "id_declined",
+         "callback", "no_callback", "wrong_number", "deceased", "unclear", "other")
+
+
+def role(row):
+    return row.get("role") or "other"
+
+
 def end_key(outcome, reason):
     return "end_" + re.sub(r"\W+", "_", outcome + ("_" + reason if reason else "")).strip("_").lower()
 
@@ -146,8 +154,17 @@ def build(spec, openapi):
     C = spec.get("close") or {}
     notes = spec.get("notes") or {}
     data = {k: spec.get(k) for k in ("calendar", "callback", "identity", "account", "product_types", "bands", "attempts",
-                                      "promise_tool", "transfer", "notes", "lines", "currency_word", "close")}
+                                      "promise_tool", "transfer", "notes", "lines", "currency_word", "close", "outcomes")}
     have = set(tools)
+    if "schedule_callback" in tools:     # which callback fields hold the date and the time, from the tool API
+        cf = tools["schedule_callback"]["fields"]
+        dp = [f for f, x in cf.items() if x.get("format") == "date" or "date" in f or "day" in f]
+        tp = [f for f, x in cf.items() if f not in dp and ("time" in f or "hour" in f or "HH" in str(x.get("description", "")))]
+        data["callback"] = dict(data.get("callback") or {}, date_param=dp[0] if dp else "date", time_param=tp[0] if tp else "time")
+
+    def key_for(rl):
+        rows = [r for r in spec.get("outcomes") or [] if role(r) == rl]
+        return end_key(rows[0]["outcome"], rows[0].get("reason") or "") if rows else None
 
     def stage_rows(*stages):
         return [r for r in spec.get("outcomes") or [] if r.get("stage") in stages + ("any",)]
@@ -177,7 +194,7 @@ def build(spec, openapi):
                           baked={C.get("outcome_param") or "outcome": "{{close_outcome}}", C.get("reason_param") or "reason": "{{close_reason}}"},
                           config={"timeoutMs": 12000, "maxRetries": 1, "alwaysRunsAt": ["end_of_call"]},
                           pre=rc.fill(rc.CLOSE_PRE, data, OPARAM=rc.pystr(C.get("outcome_param") or "outcome"),
-                                      RPARAM=rc.pystr(C.get("reason_param") or "reason"), NOREASON=rc.embed(C.get("no_reason_outcomes") or ["promise", "paid"])))
+                                      RPARAM=rc.pystr(C.get("reason_param") or "reason"), NOREASON=rc.embed(C.get("no_reason_outcomes") or sorted({r["outcome"] for r in spec.get("outcomes") or [] if not r.get("reason")}))))
     # close_call is never a dialogue tool: the end code nodes set close_outcome / close_reason.
     close_tool["function"]["description"] = "Record how the call ended. Outcome and reason come from the conversation and the brief's outcome table."
 
@@ -200,7 +217,7 @@ def build(spec, openapi):
     nodes["setup"] = code_node("setup", rc.fill(rc.SETUP, data), "opening")
 
     # -------- opening: who is on the line
-    contact_ends = [end_transition(spec, r) for r in stage_rows("contact") if r["outcome"] != "transferred"]
+    contact_ends = [end_transition(spec, r) for r in stage_rows("contact") if role(r) not in ("transferred", "unclear")]
     third_rows = stage_rows("third_party")
     opening_tr = [
         {"target_node": "identity", "is_tool_call": True,
@@ -214,7 +231,7 @@ def build(spec, openapi):
     opening_tr += contact_ends
     opening_tools = [t for t in [transfer] if t]
     if transfer:
-        opening_tr = [transfer_route(T, q) for q in (T.get("queue_to_reason") or {})] + opening_tr
+        opening_tr = [transfer_route(spec, q) for q in (T.get("queue_to_reason") or {})] + opening_tr
     c = spec.get("contact") or {}
     nodes["opening"] = conv_node(
         "opening",
@@ -223,13 +240,13 @@ def build(spec, openapi):
         "\nThe customer's full name: {{first_name}} {{last_name}}. Address them as {{title}} {{last_name}}.",
         tools=opening_tools, transitions=opening_tr,
         on_enter={"type": "tts", "text": tmpl(no_recorded(L.get("opening") or "") + " " + (L.get("confirm_identity") or "Am I speaking with {title} {last_name}?"))},
-        max_turns=8, max_target=end_key("not_reached", "unclear") if any(r.get("reason") == "unclear" for r in stage_rows("contact")) else None)
+        max_turns=8, max_target=key_for("unclear"))
 
     # -------- third party
     if third_rows and callback:
-        tp_tr = [{"target_node": end_key("not_reached", "callback"), "description": "callback scheduled",
-                  "condition": cond_eq("callback_state", "scheduled")}] if any(r.get("reason") == "callback" for r in third_rows) else []
-        tp_tr += [end_transition(spec, r) for r in third_rows + stage_rows("contact") if r.get("reason") not in ("callback", "unclear") and r["outcome"] != "transferred"]
+        tp_tr = [{"target_node": key_for("callback"), "description": "callback scheduled",
+                  "condition": cond_eq("callback_state", "scheduled")}] if key_for("callback") else []
+        tp_tr += [end_transition(spec, r) for r in third_rows + stage_rows("contact") if role(r) not in ("callback", "unclear", "transferred")]
         nodes["third_party"] = conv_node(
             "third_party",
             "The person on the line is NOT the customer {{first_name}} {{last_name}}. Do not say why you are calling. Ask when {{title}} {{last_name}} can be reached.\n"
@@ -245,15 +262,14 @@ def build(spec, openapi):
                   {"variable": "identity_state", "operator": "equals", "operand": "verified"},
                   {"variable": "verify_identity_response.data." + ((I.get("response") or {}).get("all_ok") or "all_verified"), "operator": "equals", "operand": "true"},
                   {"variable": "verify_identity_response.data." + ((I.get("response") or {}).get("all_ok") or "all_verified"), "operator": "equals", "operand": "True"}]}}]
-    failed = [r for r in id_rows if r.get("reason") == "failed"]
-    if failed:
-        id_tr.append({"target_node": end_key("not_verified", "failed"), "description": "identity check failed",
+    if key_for("id_failed"):
+        id_tr.append({"target_node": key_for("id_failed"), "description": "identity check failed",
                       "condition": {"logic": "or", "conditions": [
                           {"variable": "identity_state", "operator": "equals", "operand": "failed"},
                           {"variable": "verify_identity_response.data." + ((I.get("response") or {}).get("remaining") or "wrong_answers_left"), "operator": "equals", "operand": "0"}]}})
     if transfer:
-        id_tr = [transfer_route(T, q) for q in (T.get("queue_to_reason") or {})] + id_tr
-    id_tr += [end_transition(spec, r) for r in id_rows if r.get("reason") != "failed" and r["outcome"] != "transferred"]
+        id_tr = [transfer_route(spec, q) for q in (T.get("queue_to_reason") or {})] + id_tr
+    id_tr += [end_transition(spec, r) for r in id_rows if role(r) not in ("id_failed", "transferred")]
     q_text = "\n".join(f"{i + 1}. field '{q['field']}': ask \"{q['ask']}\"" + (f" ({q.get('answer_format')})" if q.get("answer_format") else "") for i, q in enumerate(qs))
     nodes["identity"] = conv_node(
         "identity",
@@ -263,7 +279,7 @@ def build(spec, openapi):
         (R.get("identity") or "") + pre_verif,
         tools=[verify] + ([transfer] if transfer else []), transitions=id_tr,
         on_enter={"type": "tts", "text": tmpl((L.get("identity_intro") or "") + " " + (qs[0]["ask"] if qs else ""))},
-        max_turns=20, max_target=end_key("not_verified", "declined") if any(r.get("reason") == "declined" for r in id_rows) else None)
+        max_turns=20, max_target=key_for("id_declined"))
 
     # -------- account
     acc = spec.get("account") or {}
@@ -287,10 +303,11 @@ def build(spec, openapi):
     neg_rows = stage_rows("negotiate")
     neg_tr = []
     if transfer:
-        neg_tr += [transfer_route(T, q) for q in (T.get("queue_to_reason") or {})]
-    neg_tr.append({"target_node": end_key("promise", ""), "description": "every product has a recorded promise",
-                   "condition": cond_eq("promises_all", "yes")})
-    ends = [r for r in neg_rows if not (r["outcome"] == "transferred")]
+        neg_tr += [transfer_route(spec, q) for q in (T.get("queue_to_reason") or {})]
+    if key_for("promise"):   # its own node, so the engine does not merge it with the model's end tool for the same row
+        neg_tr.append({"target_node": "end_all_promised", "description": "every product has a recorded promise",
+                       "condition": cond_eq("promises_all", "yes")})
+    ends = [r for r in neg_rows if role(r) != "transferred"]
     neg_tr += [end_transition(spec, r) for r in ends]
     neg_tools = [promise] + ([note] if note else []) + ([transfer] if transfer else [])
     multi_text = ""
@@ -310,15 +327,19 @@ def build(spec, openapi):
         "When the call should end, call the matching end tool. Do not end after a recorded promise yourself; that happens automatically.",
         tools=neg_tools, transitions=neg_tr,
         on_enter={"type": "tts", "text": "{{debt_statement}}"},
-        max_turns=60, max_target=end_key("no_promise", "refused") if any(r.get("reason") == "refused" for r in neg_rows) else None)
+        max_turns=60, max_target=key_for("refused"))
 
     # -------- ends
     for r in spec.get("outcomes") or []:
         key = end_key(r["outcome"], r.get("reason") or "")
         if key in nodes:
             continue
-        code = rc.fill(rc.END_PATH, {}, OUTCOME=rc.pystr(r["outcome"]), REASON=rc.pystr(r.get("reason") or ""))
+        code = rc.fill(rc.END_PATH, {}, OUTCOME=rc.pystr(r["outcome"]), REASON=rc.pystr(r.get("reason") or ""), ROLE=rc.pystr(role(r)))
         nodes[key] = code_node(key, code, "finalize")
+    pr = [r for r in spec.get("outcomes") or [] if role(r) == "promise"]
+    if pr:
+        nodes["end_all_promised"] = code_node("end_all_promised", rc.fill(rc.END_PATH, {}, OUTCOME=rc.pystr(pr[0]["outcome"]),
+                                              REASON=rc.pystr(pr[0].get("reason") or ""), ROLE=rc.pystr("promise")), "finalize")
     nodes["finalize"] = code_node("finalize", rc.fill(rc.END, data), "goodbye")
     nodes["goodbye"] = {
         "name": "goodbye", "node_type": "end_call", "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True, "transitions": [],
@@ -344,7 +365,10 @@ def build(spec, openapi):
     return wf
 
 
-def transfer_route(T, queue):
-    reason = (T.get("queue_to_reason") or {}).get(queue, queue)
-    return {"target_node": end_key("transferred", reason), "description": f"transfer to {queue} done",
+def transfer_route(spec, queue):
+    reason = ((spec.get("transfer") or {}).get("queue_to_reason") or {}).get(queue, queue)
+    rows = [r for r in spec.get("outcomes") or [] if role(r) == "transferred"]
+    match = [r for r in rows if (r.get("reason") or "") == reason] or rows
+    target = end_key(match[0]["outcome"], match[0].get("reason") or "") if match else "finalize"
+    return {"target_node": target, "description": f"transfer to {queue} done",
             "condition": cond_eq("transfer_done_queue", queue)}

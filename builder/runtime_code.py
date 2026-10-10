@@ -132,6 +132,16 @@ def parse_date(s, order):
             return None
     return None
 
+def clean_line(text):
+    # Fill {call_variable} placeholders; drop any sentence that still has one we cannot fill.
+    text = str(text or '')
+    def sub(m):
+        x = V(m.group(1))
+        return str(x) if x not in (None, '') and not isinstance(x, (list, dict)) else m.group(0)
+    text = re.sub(r'\{([a-zA-Z_][a-zA-Z0-9_]*)\}', sub, text)
+    parts = re.split(r'(?<=[.!?])\s+', text)
+    return ' '.join([p for p in parts if '{' not in p and '}' not in p]).strip()
+
 def products():
     raw = V('products_json', '')
     try:
@@ -307,8 +317,10 @@ try:
     parts = []
     for p in plist:
         parts.append('Your ' + p['spoken'] + ' has ' + money(p['full']) + ' past due, ' + str(p['days_late']) + ' days late.')
-    intro = L.get('debt_intro_multi' if multi else 'debt_intro') or L.get('debt_intro') or ''
-    ask = L.get('first_ask_multi' if multi else 'first_ask') or L.get('first_ask') or ''
+    intro = clean_line(L.get('debt_intro_multi' if multi else 'debt_intro') or L.get('debt_intro') or '')
+    ask = clean_line(L.get('first_ask_multi' if multi else 'first_ask') or L.get('first_ask') or '')
+    if not ask:
+        ask = 'Can you pay all of them today?' if multi else 'Can you pay this today?'
     S('debt_statement', ' '.join([x for x in [intro] + parts + [ask] if x]))
     # Facts block for the negotiation prompt.
     F = ['TODAY: ' + iso_say(today) + ', time ' + n.strftime('%H:%M') + '.']
@@ -354,20 +366,31 @@ except Exception as e:
     S('compute_error', str(e)[:200])
 '''
 
-# End of call: decide the final outcome and the farewell line from the end path taken (end_path_outcome / end_path_reason).
+# End of call: decide the final outcome and the farewell line from the end path taken
+# (end_path_outcome / end_path_reason / end_path_role) and what really happened (transfer, promises, notes).
 END = LIB + r'''
 try:
     L = DATA.get('lines') or dict()
+    O = DATA.get('outcomes') or []
+    NT = DATA.get('notes') or dict()
+
+    def row(rl, reason=None):
+        rs = [r for r in O if (r.get('role') or 'other') == rl]
+        if reason is not None:
+            rs = [r for r in rs if (r.get('reason') or '') == reason] or rs
+        return rs[0] if rs else None
+
     outcome, reason = str(V('end_path_outcome', '') or ''), str(V('end_path_reason', '') or '')
+    rl = str(V('end_path_role', '') or 'other')
     q2r = (DATA.get('transfer') or dict()).get('queue_to_reason') or dict()
     tq = str(V('transfer_done_queue', '') or '')
     rec = int(num(V('promises_recorded', '0')) or 0)
+    pick = None
     if tq:
-        outcome, reason = 'transferred', q2r.get(tq, tq)
+        pick = row('transferred', q2r.get(tq, tq))
     elif rec > 0:
-        outcome, reason = 'promise', ''
-    elif (DATA.get('notes') or dict()).get('enabled') and outcome in ('no_promise', 'paid', 'promise'):
-        notes = []
+        pick = row('promise')
+    elif NT.get('enabled') and rl in ('refused', 'hardship', 'dispute', 'service_error', 'paid', 'promise', 'other'):
         try:
             notes = json.loads(V('notes_json', '[]') or '[]')
         except Exception:
@@ -375,24 +398,30 @@ try:
         if notes:
             order = [p['product_id'] for p in products()]
             notes.sort(key=lambda x: order.index(x[0]) if x[0] in order else 99)
-            nonpaid = [x for x in notes if x[1] != 'paid']
+            paid_value = NT.get('paid_reason') or ''
+            nonpaid = [x for x in notes if x[1] != paid_value]
             if not nonpaid:
-                outcome, reason = 'paid', ''
+                pick = row('paid')
             else:
-                outcome, reason = 'no_promise', nonpaid[0][1]
+                r0 = nonpaid[0][1]
+                match = [r for r in O if (r.get('reason') or '') == r0]
+                base = match[0] if match else (row('refused') or dict(outcome=outcome))
+                pick = dict(base, reason=r0)
+    if pick:
+        outcome, reason, rl = pick.get('outcome') or outcome, pick.get('reason') or '', pick.get('role') or rl
     words = []
-    if outcome == 'promise':
+    if rl == 'promise':
         words += [L.get('promise_recorded') or '', L.get('sms_sentence') or '']
-    elif outcome == 'paid':
+    elif rl == 'paid':
         words += [L.get('already_paid') or '']
-    elif reason == 'deceased':
+    elif rl == 'deceased':
         words += [L.get('condolence') or '']
-    elif outcome == 'not_verified' and reason == 'failed':
+    elif rl == 'id_failed':
         words += [L.get('identity_failed') or '']
-    elif reason == 'service_error':
+    elif rl == 'service_error':
         words += [L.get('service_error') or '']
     words += [L.get('goodbye') or 'Goodbye.']
-    S('farewell_text', ' '.join([w for w in words if w]))
+    S('farewell_text', ' '.join([clean_line(w) for w in words if clean_line(w)]))
     S('close_outcome', outcome)
     S('close_reason', reason or '')
 except Exception as e:
@@ -586,22 +615,23 @@ try:
     if isinstance(b, dict):
         n = now_dt()
         today = n.date()
-        d = parse_date(b.get('date'), 'DMY')
+        DP, TP = cb.get('date_param') or 'date', cb.get('time_param') or 'time'
+        d = parse_date(b.get(DP), 'DMY')
         if d:
-            b['date'] = d.isoformat()
-        t = str(b.get('time') or '').strip().lower()
+            b[DP] = d.isoformat()
+        t = str(b.get(TP) or '').strip().lower()
         m = re.match(r'^(\d{1,2})(?::|\.|h)?(\d{2})?\s*(am|pm|a\.m\.|p\.m\.)?', t)
         if m:
             hh = int(m.group(1)); mm = int(m.group(2) or 0)
             if m.group(3) and m.group(3).startswith('p') and hh < 12:
                 hh += 12
-            b['time'] = '%02d:%02d' % (hh, mm)
+            b[TP] = '%02d:%02d' % (hh, mm)
         allowed = [today]
         if cb.get('days') == 'today_or_next_business_day':
             allowed = [today, next_bd(today)]
         elif cb.get('days') == 'next_business_day':
             allowed = [next_bd(today)]
-        tt = str(b.get('time') or '')
+        tt = str(b.get(TP) or '')
         why = ''
         if d not in allowed:
             why = 'the day is outside the allowed callback days'
@@ -746,6 +776,7 @@ import json
 try:
     vars['end_path_outcome'] = __OUTCOME__
     vars['end_path_reason'] = __REASON__
+    vars['end_path_role'] = __ROLE__
 except Exception:
     pass
 '''

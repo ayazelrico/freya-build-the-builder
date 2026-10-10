@@ -7,6 +7,7 @@ Code turns the SPEC into a phone-agent workflow, so every value must be exact.
 General rules
 - Take every value from the brief and the tool API file. Never invent a rule or a value.
 - When a later memo or note changes a rule, use the changed rule only.
+- Sentences in `lines` are spoken word for word by the phone agent. Code adds the product details after debt_intro, so debt_intro names no product or amount. The only placeholders allowed are call variables such as {title} and {last_name}.
 - Sentences in `lines` are spoken word for word by the phone agent. Write them in the call language,
   short, polite, and containing exactly what the brief requires to be said. `{name}` inserts a call variable.
 - Tool parameter names, enum values, response field names: copy them exactly from the tool API file.
@@ -92,14 +93,22 @@ General rules
 
   "promise_tool": {"product_param": "product_id", "amount_param": "amount", "date_param": "date", "ok_field": "ok"},
   "multi_product": false,              // true when a customer can have several products
-  "notes": {"enabled": false, "tool": "add_note", "product_param": "product_id", "reason_param": "reason", "reasons": ["..."]},
+  "notes": {"enabled": false, "tool": "add_note", "product_param": "product_id", "reason_param": "reason", "reasons": ["..."],
+            "paid_reason": "<the note reason meaning 'already paid', or empty>"},
   "transfer": {"queue_param": "queue", "queue_to_reason": {"<queue>": "<close reason used after this transfer>"}},
   "close": {"outcome_param": "outcome", "reason_param": "reason", "no_reason_outcomes": ["..."]},
 
   "outcomes": [                        // EVERY row of the brief's outcome table
     {"outcome": "<value>", "reason": "<value or empty>", "when": "<when, in a few words>",
-     "stage": "contact|third_party|identity|negotiate|any"}
+     "stage": "contact|third_party|identity|negotiate|any", "role": "<one role from the list below>"}
   ],
+  // role: what the row means, whatever the bank calls it. One of:
+  //   promise (a payment promise/arrangement was recorded), paid (customer already paid),
+  //   transferred (handed to a person/queue; one row per queue), refused (no promise: refused / attempts used up),
+  //   hardship, dispute, service_error (the promise tool failed), id_failed (too many wrong security answers),
+  //   id_declined (would not answer the security questions), callback (callback booked),
+  //   no_callback (no valid callback time), wrong_number, deceased, unclear (could not tell who answered),
+  //   other (anything else). Use each role for at most one row, except transferred.
   // stage: where in the call the outcome is decided. contact = before we know who is on the line
   //   (wrong number, unclear, deceased); third_party = someone else answered (callback...);
   //   identity = security questions; negotiate = after the debt was stated; any = can happen anywhere.
