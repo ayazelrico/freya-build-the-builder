@@ -88,6 +88,11 @@ def test_note_check():
     v["note_checked"] = ""
     run(nt["pre_process_code"], v, config=cfg); print("both offers ->", repr(v["note_block"]))
     assert not v["note_block"] and cfg["body"]["customer_id"] == "c"
+    conv3 = repr([{"role": "assistant", "content": "Can you pay all of them today?"}, {"role": "user", "content": "No, not 1320 on Friday 23 October."}])
+    cfg = {"headers": {"X-Conversation": conv3}, "body": {"customer_id": "c", "product_id": "p2", "reason": "refused"}}
+    v["note_checked"] = ""
+    run(nt["pre_process_code"], v, config=cfg); print("repr transcript, offers only by user ->", v["note_block"][:60])
+    assert v["note_block"]
     print("NOTE CHECK OK")
 
 

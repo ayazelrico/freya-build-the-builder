@@ -142,6 +142,19 @@ def clean_line(text):
     parts = re.split(r'(?<=[.!?])\s+', text)
     return ' '.join([p for p in parts if '{' not in p and '}' not in p]).strip()
 
+def agent_text(conv):
+    # The transcript arrives as a list of {'role', 'content'} (JSON or Python repr) or as 'AGENT: ...' lines.
+    msgs = None
+    for parse in (json.loads, __import__('ast').literal_eval):
+        try:
+            msgs = parse(conv)
+            break
+        except Exception:
+            pass
+    if isinstance(msgs, list):
+        return ' '.join([str(m.get('content') or '') for m in msgs if isinstance(m, dict) and str(m.get('role')) in ('assistant', 'agent', 'bot')]).lower()
+    return ' '.join([ln for ln in conv.split('\n') if not ln.upper().startswith(('USER', 'CUSTOMER', 'HUMAN'))]).lower()
+
 def products():
     raw = V('products_json', '')
     try:
@@ -743,8 +756,8 @@ try:
         # A 'refused' note is only allowed after every offer of the product's sequence was made.
         rows = [r for r in (DATA.get('outcomes') or []) if (r.get('reason') or '') == reason]
         checked = [x for x in str(V('note_checked', '') or '').split(',') if x]
-        if rows and rows[0].get('role') == 'refused' and conv and '{' not in conv[:3] and pid not in checked:
-            agent = ' '.join([ln for ln in conv.split('\n') if not ln.upper().startswith(('USER', 'CUSTOMER', 'HUMAN'))]).lower()
+        if rows and rows[0].get('role') == 'refused' and conv and not conv.startswith('{' + '{') and pid not in checked:
+            agent = agent_text(conv)
             prod = [p for p in products() if p['product_id'] == pid]
             missing = None
             for o in (prod[0].get('offers') or []) if prod else []:

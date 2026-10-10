@@ -337,6 +337,8 @@ def build(spec, openapi):
         "RULES:\n" + (R.get("negotiate") or "") + multi_text + note_text +
         "\n\nDATES: whenever the customer names a day, look it up in DATE LOOKUP and do what its line says. Never compute dates yourself.\n"
         "OFFERS: for a refusal or a non-answer use the product's OFFER SEQUENCE, in order, each offer once. Ask whether they can pay today only once in the whole call.\n"
+        "SPECIAL SITUATIONS FIRST: as soon as the customer mentions a situation the rules handle specially (hardship such as illness, job loss or a death; a dispute; already paid; "
+        "a request for a new plan or a person), apply that rule at once. It takes priority over the offer sequence: make no further offers unless the rule allows them.\n"
         "AMOUNTS: unless the rules say otherwise, never ask how much the customer can or will pay. If they name a day but no amount, propose the full amount for that day.\n"
         "HONESTY: before create_promise returns ok, never say a promise is recorded, saved, booked, noted or set up. While agreeing, say you will read everything back for confirmation.\n"
         "Before create_promise: read back the product, the amount and the date (weekday, day and month) and ask " + json.dumps(L.get("confirm_question") or "Do you confirm?") + ". Call create_promise only after a clear yes.\n"

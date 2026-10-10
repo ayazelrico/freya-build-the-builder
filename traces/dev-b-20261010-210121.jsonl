@@ -1,0 +1,11 @@
+{"t": 0.0, "event": "start", "at": "2026-10-10T21:01:21+0300"}
+{"t": 0.0, "event": "inputs", "briefs": ["briefs/brief-a.md", "briefs/brief-b.md"], "openapi": "/Users/ayazelrico/Desktop/FREYA AI VOICE HACKHATON/build-the-builder/tools/openapi.json", "slot": "dev-b"}
+{"t": 0.0, "event": "spec_loaded", "path": "fixtures/brief-ab.llm-spec.json"}
+{"t": 0.0, "event": "spec_written", "path": "out/dev-b.spec.json", "outcomes": 16}
+{"t": 0.0, "event": "workflow_generated", "nodes": 26, "bytes": 318294}
+{"t": 0.7, "event": "dry_run_ok"}
+{"t": 3.7, "event": "saved_on_freya", "workflow_id": "161e15b7-f3a4-4692-ba1e-42b8f298af56", "agent_id": "39ebb914-4456-4b56-b85e-2b032298e281", "version": 7}
+{"t": 6.2, "event": "agent_config_tuned", "wait_seconds": 1.5, "language": "en", "version": 8}
+{"t": 7.4, "event": "self_test_chat_turn", "ok": true, "agent_said": "Hello, I am a digital assistant calling from Freya Bank. We record this call. Am I speaking with Mr Morgan?"}
+{"t": 8.2, "event": "exported", "path": "/Users/ayazelrico/Desktop/FREYA AI VOICE HACKHATON/build-the-builder/out/dev-b.export.workflow.json"}
+{"t": 8.2, "event": "end", "at": "2026-10-10T21:01:29+0300", "seconds": 8, "slot": "dev-b"}
