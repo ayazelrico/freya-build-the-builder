@@ -1,0 +1,8 @@
+env.sh
+.venv/
+__pycache__/
+.freya-agents.json
+.personas.json
+results/
+*.mp4
+.DS_Store
