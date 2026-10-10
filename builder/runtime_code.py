@@ -618,7 +618,10 @@ try:
             S('promises_recorded', str(len(done)))
             left = [p for p in plist if p['product_id'] not in done]
             S('promises_all', 'yes' if not left else 'no')
-            d['what_to_do_next'] = 'The promise IS recorded. ' + ('Call create_promise for the next agreed product now.' if left else 'Tell the customer it is recorded.')
+            if left:
+                d['what_to_do_next'] = 'The promise IS recorded. Next: call create_promise for the next agreed product, or ' + ('add_note for each product without a promise, ' if (DATA.get('notes') or dict()).get('enabled') else '') + 'then call the end tool. Do not say goodbye.'
+            else:
+                d['what_to_do_next'] = 'The promise IS recorded. Say nothing more: the closing words are spoken automatically.'
         else:
             k = 'promise_fail_' + re.sub(r'\W', '_', pid)
             n = int(num(V(k, '0')) or 0) + 1

@@ -212,7 +212,12 @@ def build(spec, openapi):
         "Customers talk like people. If they give a number or a date in parts, wait for the rest and use the whole value. "
         "If they correct themselves ('the 21st, sorry, the 20th'), use only the corrected value. Amounts and dates said in words count like digits. "
         "If they ask a question back or talk about something else, answer briefly and return to your question. "
-        "A date they mention that is not about paying (a wedding, a birthday) is not a payment date.\n\n"
+        "A date they mention that is not about paying (a wedding, a birthday) is not a payment date.\n"
+        "If the customer's message is cut off mid-sentence, it is not an answer: reply only 'Sorry, please go on.' and wait. "
+        "A cut-off or off-topic message is never a refusal, a decline or a non-answer, and never uses up an attempt or an ask.\n"
+        "Small talk: acknowledge it in at most three words, never ask about it, then repeat your question.\n"
+        "Only an explicit no ('no', 'I will not', 'I don't want to') counts as a refusal or a decline.\n"
+        "Never repeat an offer, a question or a proposal the customer has already answered; if they answered it, move on.\n\n"
         "RULES THAT ALWAYS APPLY:\n" + (R.get("global") or "")
     )
     pre_verif = ("\nBefore identity is verified you must not say any of these: " + ", ".join(spec.get("forbidden_before_verification") or []) + ". Do not say why you are calling.") if spec.get("forbidden_before_verification") else ""
@@ -282,7 +287,8 @@ def build(spec, openapi):
         "The customer confirmed who they are. Now verify identity. Ask the security questions one at a time, in this order:\n" + q_text +
         "\nAfter every answer CALL verify_identity with that question's field and the answer exactly as the customer gave it (a date of birth may be sent in any form; it is converted for you). "
         "Then follow what_to_do_next from the result. Never tell the customer an answer is right or wrong before the tool result. "
-        "If an answer is clearly incomplete (a date without the year, fewer digits than asked), ask for the missing part first and call verify_identity once with the complete answer.\n" +
+        "If an answer is clearly incomplete (a date without the year, fewer digits than asked), ask for the missing part first and call verify_identity once with the complete answer. "
+        "As soon as the answer is complete (also when it came in several messages, or together with a question or a complaint), call verify_identity right away, before you say anything else; deal with the question afterwards.\n" +
         (R.get("identity") or "") + pre_verif,
         tools=[verify] + ([transfer] if transfer else []), transitions=id_tr,
         on_enter={"type": "tts", "text": tmpl((L.get("identity_intro") or "") + " " + (qs[0]["ask"] if qs else ""))},
@@ -331,6 +337,8 @@ def build(spec, openapi):
         "RULES:\n" + (R.get("negotiate") or "") + multi_text + note_text +
         "\n\nDATES: whenever the customer names a day, look it up in DATE LOOKUP and do what its line says. Never compute dates yourself.\n"
         "OFFERS: for a refusal or a non-answer use the product's OFFER SEQUENCE, in order, each offer once. Ask whether they can pay today only once in the whole call.\n"
+        "AMOUNTS: unless the rules say otherwise, never ask how much the customer can or will pay. If they name a day but no amount, propose the full amount for that day.\n"
+        "HONESTY: before create_promise returns ok, never say a promise is recorded, saved, booked, noted or set up. While agreeing, say you will read everything back for confirmation.\n"
         "Before create_promise: read back the product, the amount and the date (weekday, day and month) and ask " + json.dumps(L.get("confirm_question") or "Do you confirm?") + ". Call create_promise only after a clear yes.\n"
         "When the call should end, call the matching end tool. Do not end after a recorded promise yourself; that happens automatically.",
         tools=neg_tools, transitions=neg_tr,
