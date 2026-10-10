@@ -89,3 +89,23 @@ Kapasite: aynı anda 1 simülasyon, 10 case = 3–11 dk. Önce sadece fail eden 
 | Model tarih/tutar uyduruyor | Code node hesaplar + create_promise pre-hook doğrular |
 | Workflow limiti | Hep aynı slot (update+publish) |
 | 30 dk build limiti | Self-test bütçeli, zaman aşımında en iyi sürüm kalır |
+
+## 8. Final runbook (Pazar 20:00 TRT)
+
+1. Final brief'leri ve openapi dosyalarını `finals/` klasörüne koy (her brief'in kendi openapi'si).
+2. Her brief için **bir kez**, elle hiçbir adım olmadan:
+   ```bash
+   source env.sh
+   python3 build.py finals/<brief-1>.md --openapi finals/<openapi-1>.json --slot final-1
+   python3 build.py finals/<brief-2>.md --openapi finals/<openapi-2>.json --slot final-2
+   ```
+   Çıktılar: `out/final-N.export.workflow.json` (submit edilecek), `traces/final-N-<zaman>.jsonl` (submit edilecek).
+3. Çökme olursa: sadece parser/crash düzelt. Final brief'ten **hiçbir değer, kural, isim** koda/prompta girmez. Sonra builder'ı baştan çalıştır.
+4. `git add out/final-* traces/final-* && git commit && git push` → commit hash'ini al.
+5. Submit: takım (solo), repo linki, commit hash, iki export dosyası, iki trace.
+
+## 9. Durum (Cmt 21:45)
+
+- A+B ajanı varsayılan stil: 10/13 (kalan 3 fail = tek ürünlü A müşterilerinde Brief B'nin not kuralı).
+- Stiller: pieces 10/13, corrects 10/13, asks_back 10/13, in_words 9/13, talkative 7→9/13 (turn wait ayarı).
+- Sahte gizli brief'ler (C: dağınık ham materyal, D: farklı yapı) çökmeden, doğru spec'le derleniyor.

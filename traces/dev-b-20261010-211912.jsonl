@@ -1,0 +1,11 @@
+{"t": 0.0, "event": "start", "at": "2026-10-10T21:19:12+0300"}
+{"t": 0.0, "event": "inputs", "briefs": ["briefs/brief-a.md", "briefs/brief-b.md"], "openapi": "/Users/ayazelrico/Desktop/FREYA AI VOICE HACKHATON/build-the-builder/tools/openapi.json", "slot": "dev-b"}
+{"t": 0.0, "event": "spec_loaded", "path": "fixtures/brief-ab.llm-spec.json"}
+{"t": 0.0, "event": "spec_written", "path": "out/dev-b.spec.json", "outcomes": 16}
+{"t": 0.0, "event": "workflow_generated", "nodes": 26, "bytes": 329405}
+{"t": 0.9, "event": "dry_run_ok"}
+{"t": 4.0, "event": "saved_on_freya", "workflow_id": "161e15b7-f3a4-4692-ba1e-42b8f298af56", "agent_id": "39ebb914-4456-4b56-b85e-2b032298e281", "version": 12}
+{"t": 6.0, "event": "agent_config_tuned", "wait_seconds": 2.5, "language": "en", "version": 12}
+{"t": 6.6, "event": "self_test_chat_turn", "ok": false, "error": "POST /api/v2/chat/message -> 503: {\"success\":false,\"data\":{\"message\":\"Internal server error\",\"result\":{\"requestId\":\"c18541fa-fd9c-40d1-b685-778118b0f56f\"}}}"}
+{"t": 7.0, "event": "exported", "path": "/Users/ayazelrico/Desktop/FREYA AI VOICE HACKHATON/build-the-builder/out/dev-b.export.workflow.json"}
+{"t": 7.0, "event": "end", "at": "2026-10-10T21:19:19+0300", "seconds": 7, "slot": "dev-b"}
