@@ -206,7 +206,11 @@ def build(spec, openapi):
         "Say amounts as numbers and dates as weekday plus day and month. Never invent facts, figures, dates or reasons.\n"
         "Tool results may contain 'what_to_do_next'. Always do exactly what it says. After every tool result, speak to the customer or call the next tool; never end a turn with nothing.\n"
         "Call at most one tool per message. When a rule says to call a tool, call it; saying you did is not enough.\n"
-        "Never say goodbye yourself: to end the call, call the matching end tool and the closing words are spoken for you.\n\n"
+        "Never say goodbye yourself: to end the call, call the matching end tool and the closing words are spoken for you.\n"
+        "Customers talk like people. If they give a number or a date in parts, wait for the rest and use the whole value. "
+        "If they correct themselves ('the 21st, sorry, the 20th'), use only the corrected value. Amounts and dates said in words count like digits. "
+        "If they ask a question back or talk about something else, answer briefly and return to your question. "
+        "A date they mention that is not about paying (a wedding, a birthday) is not a payment date.\n\n"
         "RULES THAT ALWAYS APPLY:\n" + (R.get("global") or "")
     )
     pre_verif = ("\nBefore identity is verified you must not say any of these: " + ", ".join(spec.get("forbidden_before_verification") or []) + ". Do not say why you are calling.") if spec.get("forbidden_before_verification") else ""
@@ -275,7 +279,8 @@ def build(spec, openapi):
         "identity",
         "The customer confirmed who they are. Now verify identity. Ask the security questions one at a time, in this order:\n" + q_text +
         "\nAfter every answer CALL verify_identity with that question's field and the answer exactly as the customer gave it (a date of birth may be sent in any form; it is converted for you). "
-        "Then follow what_to_do_next from the result. Never tell the customer an answer is right or wrong before the tool result.\n" +
+        "Then follow what_to_do_next from the result. Never tell the customer an answer is right or wrong before the tool result. "
+        "If an answer is clearly incomplete (a date without the year, fewer digits than asked), ask for the missing part first and call verify_identity once with the complete answer.\n" +
         (R.get("identity") or "") + pre_verif,
         tools=[verify] + ([transfer] if transfer else []), transitions=id_tr,
         on_enter={"type": "tts", "text": tmpl((L.get("identity_intro") or "") + " " + (qs[0]["ask"] if qs else ""))},
