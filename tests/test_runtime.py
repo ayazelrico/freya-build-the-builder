@@ -68,3 +68,27 @@ def main(spec_path, openapi_path, cases_path, brief):
 
 if __name__ == "__main__":
     main(*(sys.argv[1:4] or [ROOT / "fixtures/brief-a.spec.json", ROOT / "tools/openapi.json", ROOT / "public-test-set.json"]), brief=sys.argv[4] if len(sys.argv) > 4 else "AB")
+
+
+def test_note_check():
+    spec = json.load(open(ROOT / "fixtures/brief-ab.llm-spec.json")); wf = generate.build(spec, json.load(open(ROOT / "tools/openapi.json")))
+    v = {"customer_id": "c", "first_name": "M", "last_name": "B", "title": "Mr", "now": "2026-10-14T11:00"}
+    prods = [{"product_id": "p1", "type": "credit_card", "card_last4": "9015", "past_due": 510, "days_late": 16, "minimum_payment": 153},
+             {"product_id": "p2", "type": "personal_loan", "past_due": 1320, "days_late": 16, "instalment_amount": 440}]
+    for i, p in enumerate(prods):
+        for k, x in p.items(): v[f"load_account_response.data.products.{i}.{k}"] = x
+    run(node_code(wf, "compute"), v)
+    nt = tool(wf, "negotiate", "add_note")
+    conv1 = "AGENT: Can you pay all of them today?\nUSER: No.\nAGENT: Can you pay the full 1320 on Friday 16 October?\nUSER: No."
+    cfg = {"headers": {"X-Conversation": conv1}, "body": {"customer_id": "c", "product_id": "p2", "reason": "refused"}}
+    run(nt["pre_process_code"], v, config=cfg); print("one offer only ->", v["note_block"][:160], "| header removed:", "X-Conversation" not in cfg["headers"])
+    assert v["note_block"] and cfg["body"]["customer_id"] == "blocked-by-agent-policy"
+    conv2 = conv1 + "\nAGENT: I can record the instalment amount of 440 on Friday 23 October; the rest stays overdue.\nUSER: No."
+    cfg = {"headers": {"X-Conversation": conv2}, "body": {"customer_id": "c", "product_id": "p2", "reason": "refused"}}
+    v["note_checked"] = ""
+    run(nt["pre_process_code"], v, config=cfg); print("both offers ->", repr(v["note_block"]))
+    assert not v["note_block"] and cfg["body"]["customer_id"] == "c"
+    print("NOTE CHECK OK")
+
+
+test_note_check()

@@ -189,6 +189,8 @@ def build(spec, openapi):
                         "Record why ONE product ended without a promise. CALL it once for each product without a promise, with its product_id and the reason.",
                         call_vars, pre=rc.fill(rc.NOTE_PRE, data, PPARAM=rc.pystr(notes.get("product_param") or "product_id"), RPARAM=rc.pystr(notes.get("reason_param") or "reason")),
                         post=rc.fill(rc.NOTE_POST, data))
+        # the transcript reaches the pre-hook through a header; the hook removes it before the request is sent
+        note["function"]["parameters"]["properties"]["headers"]["properties"]["X-Conversation"] = {"type": "string", "default": "{{system.conversation}}"}
 
     close_tool = api_tool(tools, "close_call", "Record how the call ended.", call_vars,
                           baked={C.get("outcome_param") or "outcome": "{{close_outcome}}", C.get("reason_param") or "reason": "{{close_reason}}"},

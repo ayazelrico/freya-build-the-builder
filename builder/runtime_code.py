@@ -352,6 +352,12 @@ try:
             F.append('- OFFER SEQUENCE ' + label + ' (each offer at most once, in this order; say it exactly as written):')
             for a in p['plan']:
                 F.append('    offer ' + str(a['number']) + ': "' + offer(a['amount_rule'] or 'full', datetime.date.fromisoformat(a['date']), too_much) + '"')
+        p['offers'] = []
+        for a in p['plan']:
+            ad = datetime.date.fromisoformat(a['date'])
+            rule = a['amount_rule'] or 'full'
+            amts = [p['floor']] if rule == 'floor' else ([p['full'], p['floor']] if rule == 'full_or_floor_if_full_refused' else [p['full']])
+            p['offers'].append(dict(number=a['number'], date=a['date'], amounts=amts, text=offer(rule, ad, False).split('  [')[0]))
         F.append('    after the last offer is refused: no more offers for this product.')
     # Calendar: what to do for every date the customer may name.
     last = max([datetime.date.fromisoformat(p['deadline']) for p in plist] or [today]) + datetime.timedelta(days=21)
@@ -376,6 +382,7 @@ try:
         F.append('- ' + say_date(d) + ' (' + d.isoformat() + ')' + (' = today' if d == today else '') + ': ' + '; '.join(acts))
         d = d + datetime.timedelta(days=1)
     S('negotiation_facts', '\n'.join(F))
+    S('products_json', json.dumps(plist))
     S('account_state', 'loaded' if plist else 'empty')
 except Exception as e:
     S('account_state', 'error')
@@ -718,9 +725,34 @@ except Exception:
 
 NOTE_PRE = LIB + r'''
 try:
+    conv = ''
+    h = config.get('headers')
+    if isinstance(h, dict):
+        conv = str(h.pop('X-Conversation', '') or '')
+    S('note_block', '')
     b = config.get('body')
     if isinstance(b, dict):
-        S('note_last', str(b.get(__PPARAM__) or '') + '|' + str(b.get(__RPARAM__) or ''))
+        pid, reason = str(b.get(__PPARAM__) or ''), str(b.get(__RPARAM__) or '')
+        S('note_last', pid + '|' + reason)
+        # A 'refused' note is only allowed after every offer of the product's sequence was made.
+        rows = [r for r in (DATA.get('outcomes') or []) if (r.get('reason') or '') == reason]
+        checked = [x for x in str(V('note_checked', '') or '').split(',') if x]
+        if rows and rows[0].get('role') == 'refused' and conv and '{' not in conv[:3] and pid not in checked:
+            agent = ' '.join([ln for ln in conv.split('\n') if not ln.upper().startswith(('USER', 'CUSTOMER', 'HUMAN'))]).lower()
+            prod = [p for p in products() if p['product_id'] == pid]
+            missing = None
+            for o in (prod[0].get('offers') or []) if prod else []:
+                d = datetime.date.fromisoformat(o['date'])
+                day = str(d.day)
+                said_date = (MONTHS[d.month - 1] in agent and re.search(r'\b' + day + r'(st|nd|rd|th)?\b', agent)) or d.isoformat() in agent
+                said_amt = any(money(x).split(' ')[0].lower() in agent for x in o['amounts'])
+                if not (said_date and said_amt):
+                    missing = o
+                    break
+            if missing:
+                S('note_checked', ','.join(checked + [pid]))
+                S('note_block', 'offer ' + str(missing['number']) + ' for the ' + prod[0]['spoken'] + ' was not made yet. Say exactly: "' + missing['text'] + '" If the customer refuses it too, call add_note again.')
+                b['customer_id'] = 'blocked-by-agent-policy'
 except Exception:
     pass
 '''
@@ -733,7 +765,11 @@ try:
         if not isinstance(d, dict):
             d = dict()
             result['data'] = d
-        if str(d.get('ok')).lower() == 'true':
+        block = str(V('note_block', '') or '')
+        if block:
+            d['ok'] = False
+            d['what_to_do_next'] = 'NOT saved: ' + block
+        elif str(d.get('ok')).lower() == 'true':
             pid, reason = (str(V('note_last', '|') or '|').split('|') + [''])[:2]
             notes = json.loads(V('notes_json', '[]') or '[]')
             notes = [x for x in notes if x[0] != pid] + [[pid, reason]]
