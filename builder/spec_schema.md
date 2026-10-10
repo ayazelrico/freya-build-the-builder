@@ -112,6 +112,8 @@ General rules
 }
 ```
 
+`rules_text.negotiate` should read as a step-by-step procedure: the exact order of offers (amount and date of each), so that no offer is ever repeated.
+
 `rules_text` must contain EVERY rule of the brief that applies in that step, including the numbers
 (limits, windows, counts). It is the agent's only source for rules that the other fields do not cover.
 Refer to tools by their names in the tool API file, and to call endings as "end as <reason>"

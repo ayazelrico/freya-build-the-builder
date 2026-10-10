@@ -23,7 +23,8 @@ def main(spec_path, openapi_path, cases_path, brief):
         v = dict(c["variables"], customer_id="c_x")
         run(node_code(wf, "setup"), v)
         prods = [dict(p, product_id=f"p{i+1}") for i, p in enumerate(c["products"])]
-        v["account_products"] = prods
+        for i, p in enumerate(prods):   # the platform stores a pre_actions result flattened under <node>_response
+            for k, x in p.items(): v[f"load_account_response.data.products.{i}.{k}"] = x
         run(node_code(wf, "compute"), v)
         print("=" * 80, c["id"], c["title"]); print(v.get("callback_facts")); print(v["debt_statement"])
         exp = c["expected"]["promises"]
@@ -59,6 +60,9 @@ def main(spec_path, openapi_path, cases_path, brief):
         v2 = dict(v, end_path_outcome=c["expected"]["outcome"], end_path_reason=c["expected"]["reason"] or "")
         if exp: v2["promises_recorded"] = str(len(exp))
         run(node_code(wf, "finalize"), v2); print("close:", v2["close_outcome"], repr(v2["close_reason"]), "|", v2["farewell_text"])
+        cfg = {"body": {"customer_id": "c_x", "outcome": v2["close_outcome"], "reason": v2["close_reason"]}}
+        run(wf["tools"][0]["pre_process_code"], v2, config=cfg)
+        assert ("reason" in cfg["body"]) == bool(c["expected"]["reason"]), cfg
     print("\nALL OK")
 
 if __name__ == "__main__":

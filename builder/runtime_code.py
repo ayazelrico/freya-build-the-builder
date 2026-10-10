@@ -196,17 +196,20 @@ def read_products():
                 except Exception:
                     pass
     # flattened keys: get_account_response.data.products.0.past_due
+    for c in [V(k) for k in list(vars.keys()) if k.endswith('_response.data.' + pf)]:
+        if isinstance(c, list):
+            return c
+    # flattened keys: <node or tool>_response.data.products.0.past_due
     out = dict()
-    prefix = 'get_account_response.data.' + pf + '.'
+    pat = re.compile(r'_response\.data\.' + re.escape(pf) + r'\.(\d+)\.(.+)$')
     try:
         keys = list(vars.keys())
     except Exception:
         keys = []
     for k in keys:
-        if k.startswith(prefix):
-            rest = k[len(prefix):].split('.', 1)
-            if len(rest) == 2 and rest[0].isdigit():
-                out.setdefault(int(rest[0]), dict())[rest[1]] = vars.get(k)
+        m = pat.search(k)
+        if m:
+            out.setdefault(int(m.group(1)), dict())[m.group(2)] = vars.get(k)
     return [out[i] for i in sorted(out)]
 
 def band_for(days):
@@ -693,6 +696,7 @@ except Exception:
 '''
 
 CLOSE_PRE = r'''
+import json
 try:
     b = config.get('body')
     if isinstance(b, dict):
