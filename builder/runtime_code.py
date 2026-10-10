@@ -737,6 +737,9 @@ try:
     if isinstance(b, dict):
         pid, reason = str(b.get(__PPARAM__) or ''), str(b.get(__RPARAM__) or '')
         S('note_last', pid + '|' + reason)
+        if (DATA.get('notes') or dict()).get('none_on_transfer') and str(V('transfer_done_queue', '') or ''):
+            S('note_block', 'the call was transferred, and no notes are written on a transferred call. Do not call add_note again; the call ends now.')
+            b['customer_id'] = 'blocked-by-agent-policy'
         # A 'refused' note is only allowed after every offer of the product's sequence was made.
         rows = [r for r in (DATA.get('outcomes') or []) if (r.get('reason') or '') == reason]
         checked = [x for x in str(V('note_checked', '') or '').split(',') if x]

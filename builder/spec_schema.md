@@ -98,7 +98,8 @@ General rules
   "promise_tool": {"product_param": "product_id", "amount_param": "amount", "date_param": "date", "ok_field": "ok"},
   "multi_product": false,              // true when a customer can have several products
   "notes": {"enabled": false, "tool": "add_note", "product_param": "product_id", "reason_param": "reason", "reasons": ["..."],
-            "paid_reason": "<the note reason meaning 'already paid', or empty>"},
+            "paid_reason": "<the note reason meaning 'already paid', or empty>",
+            "none_on_transfer": false},      // true when the brief says no notes at all on a transferred call
   "transfer": {"queue_param": "queue", "queue_to_reason": {"<queue>": "<close reason used after this transfer>"}},
   "close": {"outcome_param": "outcome", "reason_param": "reason", "no_reason_outcomes": ["..."]},
 

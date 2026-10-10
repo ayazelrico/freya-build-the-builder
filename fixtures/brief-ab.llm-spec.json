@@ -194,7 +194,8 @@
    "paid",
    "service_error"
   ],
-  "paid_reason": "paid"
+  "paid_reason": "paid",
+  "none_on_transfer": true
  },
  "transfer": {
   "queue_param": "queue",

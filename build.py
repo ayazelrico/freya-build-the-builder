@@ -5,13 +5,39 @@
 Steps: brief -> SPEC (Claude) -> workflow (deterministic code) -> dry-run validation -> save + publish on Freya
 -> export. Every step is written to traces/<slot>-<time>.jsonl.
 """
-import argparse, json, pathlib, sys, time
+import argparse, json, os, pathlib, sys, time
 
 ROOT = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 import freya
 from builder import generate
 from builder.trace import Trace
+
+
+LANG_CODES = {"english": "en", "german": "de", "french": "fr", "spanish": "es", "italian": "it", "dutch": "nl", "turkish": "tr", "portuguese": "pt"}
+
+
+def tune_agent_config(workflow_id, spec, trace):
+    """The platform fills in agent settings when a workflow is saved. Its turn-taking default (start speaking 0.5 s after
+    the caller pauses) cuts talkative callers off mid-sentence, and its speech language defaults to Turkish.
+    Give callers time to finish and match the brief's language. The model is left exactly as it is."""
+    try:
+        wait = float(os.environ.get("TURN_WAIT_SECONDS", "1.5"))
+        w = freya.api("GET", f"/api/v2/workflow/{workflow_id}", workspaceId=freya.workspace_id())["workflow"]["workflow"]
+        ac = w.get("agent_config") or {}
+        tts = ac.setdefault("ttsConfig", {}); stt = ac.setdefault("sttConfig", {})
+        tts.setdefault("startSpeakingPlan", {})["waitSeconds"] = wait
+        lang = LANG_CODES.get(str(spec.get("language") or "English").strip().lower())
+        if lang:
+            tts["language"] = lang; stt["language"] = lang
+        freya.api("PUT", f"/api/v2/workflow/{workflow_id}", {"workflow": {**w, "agent_config": ac}})
+        vs = freya.api("GET", f"/api/v2/versions/workflow/{workflow_id}", workspaceId=freya.workspace_id())["versions"]
+        newest = max(vs, key=lambda v: v["versionNumber"])
+        if not newest.get("isPublished"):
+            freya.api("POST", f"/api/v2/versions/workflow/{workflow_id}/publish", {"versionId": newest["id"]})
+        trace.event("agent_config_tuned", wait_seconds=wait, language=lang, version=newest["versionNumber"])
+    except Exception as e:
+        trace.event("agent_config_tune_failed", error=str(e)[:300])
 
 
 def smoke_test(workflow_id, wf, trace):
@@ -60,6 +86,7 @@ def main():
         trace.event("dry_run_ok")
         ids = freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json"))
         trace.event("saved_on_freya", **ids)
+        tune_agent_config(ids["workflow_id"], spec, trace)
         smoke_test(ids["workflow_id"], wf, trace)
         path = freya.export_workflow(ids["workflow_id"], str(out / f"{slot}.export.workflow.json"))
         trace.event("exported", path=path)
