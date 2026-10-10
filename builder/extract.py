@@ -18,11 +18,13 @@ def _client():
     return anthropic.Anthropic(max_retries=4)
 
 
-def _ask(trace, purpose, prompt, effort="high"):
+def _ask(trace, purpose, base, prompt, effort="high"):
+    """`base` (schema, tool API, briefs) is the same in every call, so it is cached; `prompt` is the varying part."""
+    content = [{"type": "text", "text": base, "cache_control": {"type": "ephemeral"}}, {"type": "text", "text": prompt}]
     with _client().messages.stream(
         model=MODEL, max_tokens=64000, system=SYSTEM,
         thinking={"type": "adaptive"}, output_config={"effort": effort},
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": content}],
     ) as stream:
         msg = stream.get_final_message()
     text = "".join(b.text for b in msg.content if b.type == "text")
@@ -30,6 +32,31 @@ def _ask(trace, purpose, prompt, effort="high"):
     m = re.search(r"```json\s*(.*?)```", text, re.S)
     raw = m.group(1) if m else text[text.find("{"): text.rfind("}") + 1]
     return json.loads(raw)
+
+
+def apply_changes(spec, changes):
+    """Apply [{"path": "a.b.0.c", "value": ...}] to the spec. Returns how many were applied."""
+    n = 0
+    for ch in changes or []:
+        try:
+            keys = str(ch["path"]).split(".")
+            cur = spec
+            for k in keys[:-1]:
+                cur = cur[int(k)] if isinstance(cur, list) else cur.setdefault(k, {})
+            last = keys[-1]
+            if isinstance(cur, list):
+                if int(last) == len(cur): cur.append(ch["value"])
+                else: cur[int(last)] = ch["value"]
+            else:
+                cur[last] = ch["value"]
+            n += 1
+        except Exception:
+            pass
+    return n
+
+
+CHANGES_FORMAT = ('Answer with a JSON object {"changes": [{"path": "<dot path, list items by index, e.g. lines.opening or outcomes.3.role>", '
+                  '"value": <the complete new value at that path>}]}. Give only the paths that must change; an empty list if nothing must change.')
 
 
 ROLES = {"promise", "paid", "transferred", "refused", "hardship", "dispute", "service_error", "id_failed", "id_declined",
@@ -91,19 +118,19 @@ def extract_spec(brief_texts, openapi_text, trace):
     if len(brief_texts) > 1:
         base += "The later briefs build on the earlier ones: every earlier rule applies unless a later one replaces it.\n\n"
     try:
-        spec = _ask(trace, "extract the SPEC from the brief", base + "Write the SPEC for these briefs.")
+        spec = _ask(trace, "extract the SPEC from the brief", base, "Write the SPEC for these briefs.")
     except (json.JSONDecodeError, ValueError):
-        spec = _ask(trace, "extract the SPEC (retry after invalid JSON)", base + "Write the SPEC for these briefs. Output valid JSON only.")
+        spec = _ask(trace, "extract the SPEC (retry after invalid JSON)", base, "Write the SPEC for these briefs. Output valid JSON only.")
     review = (
-        base + "Here is a SPEC written for these briefs:\n```json\n" + json.dumps(spec, indent=1) + "\n```\n\n"
+        "Here is a SPEC written for these briefs:\n```json\n" + json.dumps(spec, indent=1) + "\n```\n\n"
         "Review it against the briefs line by line. Check: every rule of the brief is represented (in a field or in rules_text); "
-        "every value is exact; rules changed by later material use the changed version; every outcome row is present with a correct stage; "
-        "tool parameter and field names match the tool API exactly; required sentences are in `lines`. "
-        "Return the corrected, complete SPEC (the whole object)."
+        "every value is exact; rules changed by later material use the changed version; every outcome row is present with a correct stage and role; "
+        "tool parameter and field names match the tool API exactly; required sentences are in `lines`.\n" + CHANGES_FORMAT
     )
     try:
-        spec = _ask(trace, "coverage review and correction of the SPEC", review)
-    except (json.JSONDecodeError, ValueError, anthropic.APIError) as e:
+        ch = _ask(trace, "coverage review of the SPEC (returns corrections only)", base, review).get("changes") or []
+        trace.event("review_corrections", applied=apply_changes(spec, ch), paths=[c.get("path") for c in ch][:40])
+    except (json.JSONDecodeError, ValueError, AttributeError, anthropic.APIError) as e:
         trace.event("review_failed_keeping_first_spec", error=str(e)[:200])
     openapi = json.loads(openapi_text)
     for attempt in range(2):
@@ -111,11 +138,12 @@ def extract_spec(brief_texts, openapi_text, trace):
         trace.event("spec_check", attempt=attempt, problems=found)
         if not found:
             break
-        fix = (base + "Here is a SPEC written for these briefs:\n```json\n" + json.dumps(spec, indent=1) + "\n```\n\n"
-               "An automatic check found these problems:\n- " + "\n- ".join(found) + "\n\nFix them and return the whole corrected SPEC.")
+        fix = ("Here is a SPEC written for these briefs:\n```json\n" + json.dumps(spec, indent=1) + "\n```\n\n"
+               "An automatic check found these problems:\n- " + "\n- ".join(found) + "\n\nFix them.\n" + CHANGES_FORMAT)
         try:
-            spec = _ask(trace, "repair the SPEC after the automatic check", fix, effort="medium")
-        except (json.JSONDecodeError, ValueError, anthropic.APIError) as e:
+            ch = _ask(trace, "repair the SPEC after the automatic check (corrections only)", base, fix, effort="medium").get("changes") or []
+            trace.event("repair_corrections", applied=apply_changes(spec, ch))
+        except (json.JSONDecodeError, ValueError, AttributeError, anthropic.APIError) as e:
             trace.event("repair_failed_keeping_spec", error=str(e)[:200])
             break
     return spec

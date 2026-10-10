@@ -1,0 +1,13 @@
+{"t": 0.0, "event": "start", "at": "2026-10-10T20:34:35+0300"}
+{"t": 0.0, "event": "inputs", "briefs": ["briefs/brief-a.md", "briefs/brief-b.md"], "openapi": "/Users/ayazelrico/Desktop/FREYA AI VOICE HACKHATON/build-the-builder/tools/openapi.json", "slot": "dev-b"}
+{"t": 91.9, "event": "model_call", "model": "claude-opus-5-5", "purpose": "extract the SPEC from the brief", "input_tokens": 17, "output_tokens": 11672}
+{"t": 128.2, "event": "model_call", "model": "claude-opus-5-5", "purpose": "coverage review of the SPEC (returns corrections only)", "input_tokens": 7062, "output_tokens": 4274}
+{"t": 128.2, "event": "review_corrections", "applied": 1, "paths": ["rules_text.negotiate"]}
+{"t": 128.2, "event": "spec_check", "attempt": 0, "problems": []}
+{"t": 128.2, "event": "spec_written", "path": "out/dev-b.spec.json", "outcomes": 16}
+{"t": 128.2, "event": "workflow_generated", "nodes": 26, "bytes": 313653}
+{"t": 129.2, "event": "dry_run_ok"}
+{"t": 133.8, "event": "saved_on_freya", "workflow_id": "161e15b7-f3a4-4692-ba1e-42b8f298af56", "agent_id": "39ebb914-4456-4b56-b85e-2b032298e281", "version": 5}
+{"t": 135.5, "event": "self_test_chat_turn", "ok": true, "agent_said": "Hello, I am a digital assistant calling from Freya Bank. We record this call. Am I speaking with Mr Morgan?"}
+{"t": 136.5, "event": "exported", "path": "/Users/ayazelrico/Desktop/FREYA AI VOICE HACKHATON/build-the-builder/out/dev-b.export.workflow.json"}
+{"t": 136.5, "event": "end", "at": "2026-10-10T20:36:52+0300", "seconds": 136, "slot": "dev-b"}
