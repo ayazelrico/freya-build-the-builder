@@ -14,6 +14,19 @@ from builder import generate
 from builder.trace import Trace
 
 
+def smoke_test(workflow_id, wf, trace):
+    """One chat turn against the published agent: it must start and speak. Seconds, not minutes."""
+    try:
+        r = freya.api("POST", "/api/v2/chat/message", {"workflowId": workflow_id, "message": "Hello?", "customerVariables": wf.get("test_variables", {})})
+        said = r.get("response") or ""
+        trace.event("self_test_chat_turn", ok=bool(said), agent_said=said[:200])
+        if r.get("callId"):
+            try: freya.api("POST", "/api/v2/chat/end", {"callId": r["callId"]})
+            except Exception: pass
+    except Exception as e:
+        trace.event("self_test_chat_turn", ok=False, error=str(e)[:300])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("briefs", nargs="+")
@@ -47,6 +60,7 @@ def main():
         trace.event("dry_run_ok")
         ids = freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json"))
         trace.event("saved_on_freya", **ids)
+        smoke_test(ids["workflow_id"], wf, trace)
         path = freya.export_workflow(ids["workflow_id"], str(out / f"{slot}.export.workflow.json"))
         trace.event("exported", path=path)
         print(json.dumps(ids))

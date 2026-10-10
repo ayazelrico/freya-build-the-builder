@@ -7,7 +7,7 @@ Code turns the SPEC into a phone-agent workflow, so every value must be exact.
 General rules
 - Take every value from the brief and the tool API file. Never invent a rule or a value.
 - When a later memo or note changes a rule, use the changed rule only.
-- Sentences in `lines` are spoken word for word by the phone agent. Code adds the product details after debt_intro, so debt_intro names no product or amount. The only placeholders allowed are call variables such as {title} and {last_name}.
+- Sentences in `lines` are spoken word for word by the phone agent. Code adds the product details after debt_intro, so debt_intro names no product or amount. The only placeholders allowed are call variables such as {title} and {last_name}, plus {amount}, {date} and {floor_name} in full_offer and floor_offer.
 - Sentences in `lines` are spoken word for word by the phone agent. Write them in the call language,
   short, polite, and containing exactly what the brief requires to be said. `{name}` inserts a call variable.
 - Tool parameter names, enum values, response field names: copy them exactly from the tool API file.
@@ -33,6 +33,9 @@ General rules
     "debt_intro_multi": "...",         // same for several products
     "first_ask": "...",                // first question after stating the debt (single product)
     "first_ask_multi": "...",          // same for several products
+    "full_offer": "Can you pay the full {amount} on {date}?",            // a persuasion offer of the full amount
+    "floor_offer": "...{floor_name}...{amount}...{date}...",           // an offer of the floor amount, with every sentence the brief requires
+                                                                        // when the floor is offered (e.g. that the rest stays overdue)
     "confirm_question": "Do you confirm?",
     "promise_recorded": "...",         // said only after the promise tool succeeded
     "sms_sentence": "...",             // any sentence the brief requires after a recorded promise, "" if none

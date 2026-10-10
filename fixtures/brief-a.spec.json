@@ -29,7 +29,9 @@
   "change_promise": "A recorded promise cannot be changed on this call, but you can change it in the mobile app.",
   "condolence": "I am sorry for your loss.",
   "no_info": "I am sorry, I do not have that information.",
-  "goodbye": "Thank you for your time. Goodbye."
+  "goodbye": "Thank you for your time. Goodbye.",
+  "full_offer": "Can you pay the full {amount} on {date}?",
+  "floor_offer": "I can record the {floor_name} of {amount} on {date}; the rest stays overdue. Can you pay that?"
  },
  "forbidden_before_verification": [
   "collections",

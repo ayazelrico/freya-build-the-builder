@@ -32,6 +32,58 @@ def _ask(trace, purpose, prompt, effort="high"):
     return json.loads(raw)
 
 
+ROLES = {"promise", "paid", "transferred", "refused", "hardship", "dispute", "service_error", "id_failed", "id_declined",
+         "callback", "no_callback", "wrong_number", "deceased", "unclear", "other"}
+NEEDED_LINES = ["opening", "confirm_identity", "identity_intro", "identity_failed", "debt_intro", "first_ask", "confirm_question",
+                "promise_recorded", "full_offer", "floor_offer", "goodbye"]
+
+
+def problems(spec, openapi):
+    """Mechanical checks of a SPEC. Returns a list of plain-language problems (empty when fine)."""
+    out = []
+    cv = set(spec.get("call_variables") or [])
+    L = spec.get("lines") or {}
+    for k in NEEDED_LINES:
+        if not L.get(k):
+            out.append(f"lines.{k} is missing or empty")
+    for k, v in L.items():
+        allowed = cv | ({"amount", "date", "floor_name"} if k in ("full_offer", "floor_offer") else set())
+        for ph in re.findall(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}", str(v)):
+            if ph not in allowed:
+                out.append(f"lines.{k} uses the placeholder {{{ph}}}, which is not allowed there (allowed: {sorted(allowed)})")
+    rows = spec.get("outcomes") or []
+    if not rows:
+        out.append("outcomes is empty")
+    seen = {}
+    for r in rows:
+        if r.get("role") not in ROLES:
+            out.append(f"outcome row {r.get('outcome')}/{r.get('reason')} has no valid role")
+        elif r["role"] != "transferred":
+            seen.setdefault(r["role"], []).append(r)
+    for rl, rs in seen.items():
+        if len(rs) > 1 and rl != "other":
+            out.append(f"role {rl} is used by {len(rs)} rows")
+    if "promise" not in seen:
+        out.append("no outcome row has role promise")
+    paths = (openapi.get("paths") or {})
+    vi = ((paths.get("/verify_identity") or {}).get("post") or {})
+    enum = []
+    try:
+        enum = vi["requestBody"]["content"]["application/json"]["schema"]["properties"][(spec.get("identity") or {}).get("field_param") or "field"].get("enum") or []
+    except Exception:
+        pass
+    for q in (spec.get("identity") or {}).get("questions") or []:
+        if enum and q.get("field") not in enum:
+            out.append(f"identity question field {q.get('field')} is not one of the tool API values {enum}")
+    for b in spec.get("bands") or []:
+        if (b.get("deadline") or {}).get("type") not in ("business_days_after_today", "business_days_after_today_counting_today", "calendar_days_after_today", "end_of_month", "end_of_next_month", "fixed_date"):
+            out.append(f"band {b.get('name')} has an unknown deadline type")
+    for h in (spec.get("calendar") or {}).get("holidays") or []:
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(h)):
+            out.append(f"holiday {h} is not YYYY-MM-DD")
+    return out
+
+
 def extract_spec(brief_texts, openapi_text, trace):
     schema = (HERE / "spec_schema.md").read_text()
     briefs = "\n\n".join(f"<brief file=\"{name}\">\n{text}\n</brief>" for name, text in brief_texts)
@@ -53,4 +105,16 @@ def extract_spec(brief_texts, openapi_text, trace):
         spec = _ask(trace, "coverage review and correction of the SPEC", review)
     except (json.JSONDecodeError, ValueError):
         pass
+    openapi = json.loads(openapi_text)
+    for attempt in range(2):
+        found = problems(spec, openapi)
+        trace.event("spec_check", attempt=attempt, problems=found)
+        if not found:
+            break
+        fix = (base + "Here is a SPEC written for these briefs:\n```json\n" + json.dumps(spec, indent=1) + "\n```\n\n"
+               "An automatic check found these problems:\n- " + "\n- ".join(found) + "\n\nFix them and return the whole corrected SPEC.")
+        try:
+            spec = _ask(trace, "repair the SPEC after the automatic check", fix, effort="medium")
+        except (json.JSONDecodeError, ValueError):
+            break
     return spec

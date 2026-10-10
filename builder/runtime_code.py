@@ -332,30 +332,47 @@ try:
         F.append('- Days late: ' + str(p['days_late']) + ', band ' + p['band'] + ', persuasion attempts allowed: ' + str(p['attempts']) + '.')
         dl = datetime.date.fromisoformat(p['deadline'])
         F.append('- DEADLINE (latest date you may record): ' + iso_say(dl) + '.')
-        for a in p['plan']:
-            ad = datetime.date.fromisoformat(a['date'])
-            rule = a['amount_rule'] or 'full'
-            if rule == 'floor':
-                amt = 'the floor ' + money(p['floor'])
-            elif rule == 'full_or_floor_if_full_refused':
-                amt = 'the full ' + money(p['full']) + ' (or the floor ' + money(p['floor']) + ' if they already said the full amount is too much)'
-            else:
-                amt = 'the full ' + money(p['full'])
-            F.append('- Persuasion attempt ' + str(a['number']) + ': propose ' + amt + ' on ' + iso_say(ad) + '.')
-    # Calendar table from today to the latest deadline plus a margin.
-    last = max([datetime.date.fromisoformat(p['deadline']) for p in plist] or [today]) + datetime.timedelta(days=10)
+        def offer(rule, ad, too_much):
+            use_floor = rule == 'floor' or (rule == 'full_or_floor_if_full_refused' and too_much)
+            tpl = (L.get('floor_offer') if use_floor else L.get('full_offer')) or ''
+            amt = p['floor'] if use_floor else p['full']
+            vals = dict(amount=money(amt), date=say_date(ad), floor_name=p['floor_name'], product=p['spoken'])
+            try:
+                txt = tpl.format(**vals) if tpl else ''
+            except Exception:
+                txt = ''
+            if not txt:
+                txt = 'Can you pay ' + ('the ' + p['floor_name'] + ' of ' if use_floor else 'the full ') + money(amt) + ' on ' + say_date(ad) + '?'
+            return txt + '  [amount ' + str(amt) + ', date ' + ad.isoformat() + ']'
+        seqs = [('if the customer refuses or does not answer', False)]
+        if any(a['amount_rule'] == 'full_or_floor_if_full_refused' for a in p['plan']):
+            seqs.append(('if the customer said the full amount is too much', True))
+        for label, too_much in seqs:
+            F.append('- OFFER SEQUENCE ' + label + ' (each offer at most once, in this order; say it exactly as written):')
+            for a in p['plan']:
+                F.append('    offer ' + str(a['number']) + ': "' + offer(a['amount_rule'] or 'full', datetime.date.fromisoformat(a['date']), too_much) + '"')
+        F.append('    after the last offer is refused: no more offers for this product.')
+    # Calendar: what to do for every date the customer may name.
+    last = max([datetime.date.fromisoformat(p['deadline']) for p in plist] or [today]) + datetime.timedelta(days=21)
     F.append('')
-    F.append('CALENDAR (use it for every date the customer names):')
+    F.append('DATE LOOKUP. When the customer names a day, find it here and do exactly what its line says. (Proposing the deadline because they gave no day at all applies only when they name no day.)')
     d = today
     while d <= last:
-        tag = 'business day'
-        if not is_bd(d):
-            why = 'holiday' if d.isoformat() in HOL else 'weekend'
-            tag = 'NOT a business day (' + why + '), next business day is ' + say_date(next_bd(d)) + ' ' + next_bd(d).isoformat()
-        late = [str(p['index']) for p in plist if d > datetime.date.fromisoformat(p['deadline'])]
-        if late:
-            tag += '; AFTER THE DEADLINE of product ' + ', '.join(late)
-        F.append('- ' + say_date(d) + ' = ' + d.isoformat() + ': ' + tag)
+        acts = []
+        for p in plist:
+            dl = datetime.date.fromisoformat(p['deadline'])
+            who = ('for the ' + p['spoken'] + ': ') if len(plist) > 1 else ''
+            if d > dl:
+                acts.append(who + 'after the deadline, say the latest date you can record is ' + say_date(dl) + ' and offer that')
+            elif not is_bd(d):
+                nb = next_bd(d)
+                if nb > dl:
+                    acts.append(who + 'not a business day; offer ' + say_date(dl) + ', the latest date you can record')
+                else:
+                    acts.append(who + 'not a business day (' + ('holiday' if d.isoformat() in HOL else 'weekend') + '); offer the next business day, ' + say_date(nb) + ' (' + nb.isoformat() + ')')
+            else:
+                acts.append(who + 'OK, can be recorded')
+        F.append('- ' + say_date(d) + ' (' + d.isoformat() + ')' + (' = today' if d == today else '') + ': ' + '; '.join(acts))
         d = d + datetime.timedelta(days=1)
     S('negotiation_facts', '\n'.join(F))
     S('account_state', 'loaded' if plist else 'empty')

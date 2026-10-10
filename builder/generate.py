@@ -322,7 +322,8 @@ def build(spec, openapi):
         "The customer is verified. You have just stated the debt and asked the first question. Now get a payment promise under the rules.\n\n"
         "FACTS (computed by the bank; trust them over your own date arithmetic):\n{{negotiation_facts}}\n\n"
         "RULES:\n" + (R.get("negotiate") or "") + multi_text + note_text +
-        "\n\nHOW TO CHECK A DATE: find it in the CALENDAR list. Only a business day from today up to the product's DEADLINE can be recorded.\n"
+        "\n\nDATES: whenever the customer names a day, look it up in DATE LOOKUP and do what its line says. Never compute dates yourself.\n"
+        "OFFERS: for a refusal or a non-answer use the product's OFFER SEQUENCE, in order, each offer once. Ask whether they can pay today only once in the whole call.\n"
         "Before create_promise: read back the product, the amount and the date (weekday, day and month) and ask " + json.dumps(L.get("confirm_question") or "Do you confirm?") + ". Call create_promise only after a clear yes.\n"
         "When the call should end, call the matching end tool. Do not end after a recorded promise yourself; that happens automatically.",
         tools=neg_tools, transitions=neg_tr,
