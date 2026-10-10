@@ -103,8 +103,8 @@ def extract_spec(brief_texts, openapi_text, trace):
     )
     try:
         spec = _ask(trace, "coverage review and correction of the SPEC", review)
-    except (json.JSONDecodeError, ValueError):
-        pass
+    except (json.JSONDecodeError, ValueError, anthropic.APIError) as e:
+        trace.event("review_failed_keeping_first_spec", error=str(e)[:200])
     openapi = json.loads(openapi_text)
     for attempt in range(2):
         found = problems(spec, openapi)
@@ -115,6 +115,7 @@ def extract_spec(brief_texts, openapi_text, trace):
                "An automatic check found these problems:\n- " + "\n- ".join(found) + "\n\nFix them and return the whole corrected SPEC.")
         try:
             spec = _ask(trace, "repair the SPEC after the automatic check", fix, effort="medium")
-        except (json.JSONDecodeError, ValueError):
+        except (json.JSONDecodeError, ValueError, anthropic.APIError) as e:
+            trace.event("repair_failed_keeping_spec", error=str(e)[:200])
             break
     return spec

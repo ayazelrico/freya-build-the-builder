@@ -168,10 +168,11 @@ try:
         for d in days:
             lo = start
             if d == today and cb.get('must_be_after_now', True):
-                if n.strftime('%H:%M') >= end:
+                earliest = (n + datetime.timedelta(minutes=int(cb.get('min_minutes_after_now') or 0))).strftime('%H:%M')
+                if earliest >= end:
                     continue
-                if n.strftime('%H:%M') >= start:
-                    lo = 'after ' + n.strftime('%H:%M')
+                if earliest >= start:
+                    lo = 'after ' + earliest
             lines.append(say_date(d) + ' (' + d.isoformat() + '), ' + lo + ' to ' + end)
         S('callback_window', '; or '.join(lines) if lines else 'none')
         tomorrow = today + datetime.timedelta(days=1)
@@ -648,14 +649,16 @@ try:
             allowed = [today, next_bd(today)]
         elif cb.get('days') == 'next_business_day':
             allowed = [next_bd(today)]
+        elif cb.get('days') == 'today_only':
+            allowed = [today]
         tt = str(b.get(TP) or '')
         why = ''
         if d not in allowed:
             why = 'the day is outside the allowed callback days'
         elif not (str(cb.get('window_start') or '00:00') <= tt <= str(cb.get('window_end') or '23:59')):
             why = 'the time is outside ' + str(cb.get('window_start')) + ' to ' + str(cb.get('window_end'))
-        elif d == today and cb.get('must_be_after_now', True) and tt <= n.strftime('%H:%M'):
-            why = 'the time is not later than now'
+        elif d == today and cb.get('must_be_after_now', True) and tt <= (n + datetime.timedelta(minutes=int(cb.get('min_minutes_after_now') or 0))).strftime('%H:%M'):
+            why = 'the time is too soon after now'
         if why:
             S('callback_block', why)
             b['customer_id'] = 'blocked-by-agent-policy'

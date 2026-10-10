@@ -55,6 +55,7 @@ General rules
     "days": "today_or_next_business_day",   // one of: today_only, next_business_day, today_or_next_business_day
     "window_start": "HH:MM", "window_end": "HH:MM",    // inclusive
     "must_be_after_now": true,
+    "min_minutes_after_now": 0,        // e.g. 60 when the callback must be at least one hour after now
     "max_asks": 2
   },
 
