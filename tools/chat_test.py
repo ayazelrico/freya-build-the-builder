@@ -20,7 +20,7 @@ def main():
         body = {"workflowId": wid, "message": t, "customerVariables": vars_}
         if call_id: body["callId"] = call_id
         try:
-            r = freya.api("POST", "/api/v2/chat/message", body, retries=3)
+            r = freya.api("POST", "/api/v2/chat/message", body, retries=1)  # a 5xx may still have been processed; never resend a turn
         except Exception as e:
             print("ERROR", str(e)[:300]); break
         call_id = r.get("callId") or call_id

@@ -54,3 +54,18 @@ brief(s) + openapi.json
 - `tools/run_cases.py`: the kit's simulator runner.
 
 `KIT_README.md` is the organisers' kit README.
+
+## Final case (Freya Bank, statement debt)
+
+```bash
+source env.sh   # FREYA_API_KEY, FREYA_API_URL, ANTHROPIC_API_KEY
+python3 build.py finals/case https://freya-final-mock.ayazelrico-8bc.workers.dev --slot final-b
+```
+
+With a case folder and a mock URL (no tool API file) the builder runs in general mode (`builder/llm_workflow.py`):
+Claude reads every case document plus the Freya platform reference and the rules the builder has learned, writes the
+workflow, the builder checks it locally and with a Freya dry run (repair loop), saves and publishes it, tunes the agent
+settings (Turkish STT/TTS, turn timing), self-tests and exports it. `BUILDER_BACKEND=cli` runs the model calls through a
+logged-in Claude Code CLI (`claude -p`) instead of the API key; that is how the submitted run was made.
+The mock of the bank's services is in `mock/` (Cloudflare Worker, verified against every test answer by `mock/verify_mock.py`).
+Submitted: `submission/final-b.workflow.json`, trace `traces/final-b-20261011-212408.log`.

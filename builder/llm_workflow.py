@@ -28,6 +28,9 @@ RULES = """Rules for the workflow you write (learned on this platform; follow al
 - Keep every turn short. Say amounts and dates the way a person says them in the call language. Never invent facts: every figure comes from a tool result.
 - Callers talk like people (numbers in two parts, corrections, small talk, questions back, numbers in words). Use the corrected value; a cut-off message is not an answer.
 - Use on_enter {"type":"tts","text":"..."} for fixed sentences the documents require word for word.
+- Global nodes with "matches_intent" are judged by a classifier that can match a bare "evet", "hayır", a number or a week against a broad intent and pull the call away from a confirmation question. Use matches_intent only for explicit, unmistakable requests (a human agent, paying now, ...), and end each such condition with: "A short answer to the assistant's question (yes, no, a number, a card name, a week) never matches." Make broad catch-alls (an unrelated or out-of-scope question, anything 'other') tool-call global nodes (is_tool_call: true, condition description saying when to call it) that the model calls on purpose.
+- The first turn of the call must answer quickly and never through a tool call: fetch start-of-call data in api_request/code nodes (passthrough) before the first conversation node, and give that node an on_enter that only speaks (tts with the prepared sentence, or llm without any tool use). A tool call inside on_enter breaks the first turn.
+- Keep the graph small and deterministic: prefer variable conditions and tool-call transitions over many matches_intent transitions on every node.
 - Set max_node_turns (e.g. 40) and max_turn_transition on conversation nodes.
 """
 
