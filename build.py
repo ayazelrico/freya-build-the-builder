@@ -100,7 +100,12 @@ def detect_language(texts):
 def general_mode(a, slot, trace):
     """Cases outside the collections pattern: Claude writes the workflow from the documents (builder/llm_workflow.py)."""
     from builder import llm_workflow
-    docs = [(str(pathlib.Path(b).name), a.texts[b]) for b in a.briefs]
+    limit = int(os.environ.get("DOC_CHAR_LIMIT", "60000"))
+    docs = []
+    for b in a.briefs:      # very large files (e.g. test data dumps) go in as an excerpt that shows their shape
+        t = a.texts[b]
+        rel = str(pathlib.Path(b).relative_to(pathlib.Path(a.raw_inputs[0]))) if pathlib.Path(a.raw_inputs[0]).is_dir() else pathlib.Path(b).name
+        docs.append((rel, t if len(t) <= limit else t[:limit] + f"\n[... excerpt: first {limit} of {len(t)} characters]"))
     lang = detect_language([t for _, t in docs])
     trace.event("general_mode", documents=len(docs), mock_url=a.mock_url, language=lang)
 
