@@ -144,3 +144,30 @@ def test_check_payment():
 
 
 test_check_payment()
+
+
+def test_identity_path():
+    spec = json.load(open(ROOT / "fixtures/brief-ab.llm-spec.json")); wf = generate.build(spec, json.load(open(ROOT / "tools/openapi.json")))
+    v = {"customer_id": "c", "first_name": "O", "last_name": "P", "title": "Mr", "now": "2026-10-14T11:00"}
+    run(node_code(wf, "setup"), v)
+    def answer(text, api=None):
+        v["id_answer"] = text
+        run(node_code(wf, "id_prep"), v)
+        if v["id_route"] == "check" and api is not None:
+            for k, x in api.items(): v["id_check_response.data." + k] = x
+            run(node_code(wf, "id_after"), v)
+        return v.get("id_route"), v.get("id_submit_answer") if v.get("id_route") == "check" else None, v.get("id_say_text"), v.get("identity_state")
+    print(answer("12 July", {}))                                                        # incomplete: no year
+    print(answer("1991-07-12", {"ok": True, "verified": False, "wrong_answers_left": 2}))
+    print(answer("1991-07-12", {}))                                                     # same answer again: not resubmitted
+    print(answer("21 August 1992", {"ok": True, "verified": False, "wrong_answers_left": 1}))
+    r = answer("1990-07-21", {"ok": True, "verified": False, "wrong_answers_left": 0}); print(r); assert r[3] == "failed"
+    v2 = {"customer_id": "c", "now": "2026-10-14T11:00"}; run(node_code(wf, "setup"), v2); v.clear(); v.update(v2)
+    print(answer("1983-10-19", {"ok": True, "verified": True, "wrong_answers_left": 3, "all_verified": False}))
+    print(answer("44", {}))                                                             # pieces: two digits only
+    print(answer("4401", {"ok": True, "verified": False, "wrong_answers_left": 2, "all_verified": False}))
+    r = answer("4410", {"ok": True, "verified": True, "wrong_answers_left": 2, "all_verified": True}); print(r); assert r[3] == "verified"
+    print("IDENTITY PATH OK")
+
+
+test_identity_path()

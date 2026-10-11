@@ -192,6 +192,8 @@ try:
         S('callback_facts', 'Allowed callback times: ' + V('callback_window', '') + '. Tomorrow is ' + say_date(tomorrow) + ' (' + tomorrow.isoformat() + ').')
     S('today_iso', today.isoformat())
     S('today_facts', ' '.join(facts))
+    qs0 = ((DATA.get('identity') or dict()).get('questions') or [dict()])
+    S('id_field_now', str(qs0[0].get('field') or ''))
     S('promises_recorded', '0')
     S('promises_all', 'no')
     S('setup_state', 'done')
@@ -552,6 +554,8 @@ try:
             msg = 'The answer could not be read (' + str(d.get('error') or 'unreadable') + '). This did NOT count as a wrong answer. Ask the customer to repeat it clearly, for example a date with the month as a word.'
         elif good:
             msg = ('Correct. Now ask the next question: ' + nxt[0].get('ask')) if nxt else 'Correct. Say only: Thank you.'
+            if nxt:
+                S('id_field_now', nxt[0].get('field'))
         else:
             try:
                 n_left = int(left)
@@ -1019,7 +1023,12 @@ def check(params):
                 out.append(who + 'the amount ' + money(amt) + ' is acceptable and can be recorded.')
     if note and note != 'vague':
         out.append(note)
-    return dict(day=(d.isoformat() if d else ''), what_to_do_next=' '.join(out) or 'Nothing to check.')
+    msg = ' '.join(out) or 'Nothing to check.'
+    if all(('can be recorded' in x and 'cannot' not in x) or 'acceptable' in x for x in out) and out:
+        msg += ' Now say your next sentence to the customer: if the day and the amount are agreed, read back the product, the amount and the date and ask for confirmation; otherwise propose what is still missing.'
+    else:
+        msg += ' Now say this to the customer in one or two short sentences.'
+    return dict(day=(d.isoformat() if d else ''), what_to_do_next=msg)
 
 try:
     _r = check(params if isinstance(params, dict) else dict())
@@ -1027,4 +1036,97 @@ except Exception as e:
     _r = dict(what_to_do_next='The check failed (' + str(e)[:80] + '). Use the DATE LOOKUP in the facts.')
 S('last_check', _r.get('what_to_do_next', ''))
 return _r
+'''
+
+# --- deterministic identity path ---------------------------------------------------------------------------------
+# The extraction model writes the customer's answer into `id_answer`; these code nodes check that it is complete,
+# let the engine call verify_identity (node id_check), and turn the result into the exact next sentence (id_say_text).
+ID_PREP = LIB + r'''
+try:
+    I = DATA.get('identity') or dict()
+    qs = I.get('questions') or []
+    okset = [x for x in str(V('id_ok_fields', '') or '').split(',') if x]
+    f = str(V('id_field_now', '') or '') or ([q.get('field') for q in qs if q.get('field') not in okset] + [''])[0]
+    q = ([x for x in qs if x.get('field') == f] + [dict()])[0]
+    ans = str(V('id_answer', '') or '').strip()
+    S('id_answer', '')
+    fmt = q.get('answer_format') or 'text'
+    norm, missing = '', ''
+    if fmt == 'date':
+        d = parse_date(ans, I.get('numeric_date_order') or 'DMY')
+        if d is None or not re.search(r'\d{4}|\d{1,2}[./-]\d{1,2}[./-]\d{2}', ans) or d.year > now_dt().year - 10:
+            missing = 'the full date including the year'
+        else:
+            norm = d.isoformat()
+    elif fmt in ('digits', 'year'):
+        ds = re.sub(r'\D', '', ans)
+        need = int(q.get('digits') or (4 if fmt == 'year' else 0))
+        if need and len(ds) < need:
+            missing = 'all ' + str(need) + ' digits'
+        else:
+            norm = ds[-need:] if need else ds
+    else:
+        norm = ans
+        if not norm:
+            missing = 'the answer'
+    last = str(V('id_last_' + f, '') or '')
+    if missing:
+        S('id_route', 'ask')
+        S('id_say_text', 'Thank you. Could you please give me ' + missing + '?')
+    elif norm == last:
+        S('id_route', 'ask')
+        S('id_say_text', str(q.get('ask') or 'Could you please repeat your answer?'))
+    else:
+        S('id_route', 'check')
+        S('id_submit_field', f)
+        S('id_submit_answer', norm)
+        S('id_last_' + f, norm)
+except Exception as e:
+    S('id_route', 'ask')
+    S('id_say_text', 'Could you please repeat your answer?')
+'''
+
+ID_AFTER = LIB + r'''
+try:
+    I = DATA.get('identity') or dict()
+    R = I.get('response') or dict()
+    qs = I.get('questions') or []
+    pre = 'id_check_response.data.'
+    def g(k):
+        return V(pre + str(k), None)
+    f = str(V('id_submit_field', '') or '')
+    okset = [x for x in str(V('id_ok_fields', '') or '').split(',') if x]
+    good = str(g(R.get('answer_ok') or 'verified')).lower() == 'true'
+    allok = str(g(R.get('all_ok') or 'all_verified')).lower() == 'true'
+    hint = g(R.get('hint') or 'hint')
+    left = g(R.get('remaining') or 'wrong_answers_left')
+    okflag = str(g(R.get('ok') or 'ok')).lower()
+    if good and f and f not in okset:
+        okset.append(f)
+        S('id_ok_fields', ','.join(okset))
+    nxt = [x for x in qs if x.get('field') not in okset]
+    cur = ([x for x in qs if x.get('field') == f] + [dict()])[0]
+    S('id_say_text', '')
+    if allok or (good and not nxt):
+        S('identity_state', 'verified')
+    elif hint and str(hint) not in ('None', 'null', ''):
+        S('id_last_' + f, '')
+        S('id_say_text', 'I am sorry, could you please say it once more, with the month as a word?' if 'month' in str(dict((h.get('value'), h.get('instruction')) for h in I.get('hints') or []).get(hint, '')).lower() else 'I am sorry, could you please repeat that?')
+    elif okflag == 'false' and not good:
+        S('id_last_' + f, '')
+        S('id_say_text', 'I am sorry, I could not catch that. ' + str(cur.get('ask') or ''))
+    elif good:
+        S('id_field_now', nxt[0].get('field'))
+        S('id_say_text', 'Thank you. ' + str(nxt[0].get('ask') or ''))
+    else:
+        try:
+            n_left = int(left)
+        except Exception:
+            n_left = None
+        if n_left is not None and n_left <= 0:
+            S('identity_state', 'failed')
+        else:
+            S('id_say_text', 'I am sorry, that does not match our records. ' + str(cur.get('ask') or ''))
+except Exception as e:
+    S('id_say_text', 'Could you please repeat your answer?')
 '''

@@ -287,18 +287,54 @@ def build(spec, openapi):
         id_tr = [transfer_route(spec, q) for q in (T.get("queue_to_reason") or {})] + id_tr
     id_tr += [end_transition(spec, r) for r in id_rows if role(r) not in ("id_failed", "transferred")]
     q_text = "\n".join(f"{i + 1}. field '{q['field']}': ask \"{q['ask']}\"" + (f" ({q.get('answer_format')})" if q.get("answer_format") else "") for i, q in enumerate(qs))
-    nodes["identity"] = conv_node(
-        "identity",
-        "The customer confirmed who they are. Now verify identity. Ask the security questions one at a time, in this order:\n" + q_text +
+    # The extraction model copies the customer's answer into id_answer; code nodes then check it and the engine calls
+    # verify_identity. The dialogue model's own verify_identity tool stays as a fallback.
+    id_extract = [{"name": "id_answer", "type": "string", "min_confidence": 0.5,
+                   "description": "The customer's answer to the security question that was just asked, taken from their latest message(s); "
+                                  "join parts given across consecutive messages. Write a date as YYYY-MM-DD only if day, month and year were all said "
+                                  "(otherwise write exactly what was said, without adding a year); write digits as digits. "
+                                  "Empty if the latest message gives no answer (only small talk, a question or a refusal)."}]
+    pos = max(i for i, t in enumerate(id_tr) if t["target_node"] in ("load_account", key_for("id_failed"))) + 1
+    id_tr.insert(pos, {"target_node": "id_prep", "description": "an answer was given",
+                 "condition": cond_and({"variable": "id_answer", "operator": "is_set"}, {"variable": "id_answer", "operator": "not_equals", "operand": ""})})
+    id_task = ("The customer confirmed who they are. Now verify identity. Ask the security questions one at a time, in this order:\n" + q_text +
         "\nAfter every answer CALL verify_identity with that question's field and the answer exactly as the customer gave it (a date of birth may be sent in any form; it is converted for you). "
         "Then follow what_to_do_next from the result. Never tell the customer an answer is right or wrong before the tool result. "
         "If an answer is clearly incomplete (a date without the year, fewer digits than asked), ask for the missing part first and call verify_identity once with the complete answer. "
         "As soon as the answer is complete (also when it came in several messages, or together with a question or a complaint), call verify_identity right away, before you say anything else; deal with the question afterwards. "
         "Example: the message '21 July 1990. How' contains a complete date of birth, so call verify_identity with it at once; never answer such a message with 'I'm listening.'\n" +
-        (R.get("identity") or "") + pre_verif,
-        tools=[verify] + ([transfer] if transfer else []), transitions=id_tr,
+        (R.get("identity") or "") + pre_verif)
+    id_tools = [verify] + ([transfer] if transfer else [])
+    nodes["identity"] = conv_node(
+        "identity", id_task, tools=id_tools, transitions=id_tr, extraction=id_extract,
         on_enter={"type": "tts", "text": tmpl((L.get("identity_intro") or "") + " " + (qs[0]["ask"] if qs else ""))},
         max_turns=40, max_target=key_for("id_declined"))
+    nodes["identity_cont"] = conv_node(
+        "identity_cont", id_task, tools=id_tools, transitions=[dict(t) for t in id_tr], extraction=id_extract,
+        on_enter={"type": "tts", "text": "{{id_say_text}}"}, first_only=False,
+        max_turns=40, max_target=key_for("id_declined"))
+    nodes["id_prep"] = code_node("id_prep", rc.fill(rc.ID_PREP, data), "identity_cont",
+                                 extra_transitions=[{"target_node": "id_check", "description": "complete new answer", "condition": cond_eq("id_route", "check")}])
+    vf = I.get("field_param") or "field"; va = I.get("answer_param") or "answer"
+    v_props = {f: {"type": "string", "default": "{{" + f + "}}"} for f in tools["verify_identity"]["fields"] if f in call_vars}
+    v_props[vf] = {"type": "string", "default": "{{id_submit_field}}"}
+    v_props[va] = {"type": "string", "default": "{{id_submit_answer}}"}
+    nodes["id_check"] = {
+        "name": "id_check", "node_type": "api_request", "passthrough": True, "passthrough_default_transition": "id_after",
+        "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True,
+        "pre_actions": [{"type": "function", "config": {"timeoutMs": 12000, "maxRetries": 1}, "function": {
+            "name": "verify_identity", "handler": "__function__:api_call", "description": "Check one security answer.",
+            "parameters": {"type": "object", "properties": {
+                "url": {"type": "string", "default": tools["verify_identity"]["url"]},
+                "method": {"type": "string", "default": "POST"},
+                "headers": {"type": "object", "properties": {"Content-Type": {"type": "string", "default": "application/json"}}},
+                "body": {"type": "object", "properties": v_props, "required": []}}}}}],
+        "transitions": [always("id_after")],
+    }
+    id_after_tr = [{"target_node": "load_account", "description": "identity verified", "condition": cond_eq("identity_state", "verified")}]
+    if key_for("id_failed"):
+        id_after_tr.append({"target_node": key_for("id_failed"), "description": "identity check failed", "condition": cond_eq("identity_state", "failed")})
+    nodes["id_after"] = code_node("id_after", rc.fill(rc.ID_AFTER, data), "identity_cont", extra_transitions=id_after_tr)
 
     # -------- account
     acc = spec.get("account") or {}
