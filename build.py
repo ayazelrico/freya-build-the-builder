@@ -46,11 +46,11 @@ def tune_agent_config(workflow_id, spec, trace):
 def smoke_test(workflow_id, wf, trace):
     """One chat turn against the published agent: it must start and speak. Seconds, not minutes."""
     try:
-        r = freya.api("POST", "/api/v2/chat/message", {"workflowId": workflow_id, "message": "Hello?", "customerVariables": wf.get("test_variables", {})})
+        r = freya.api("POST", "/api/v2/chat/message", {"workflowId": workflow_id, "message": "Hello?", "customerVariables": wf.get("test_variables", {})}, retries=2)
         said = r.get("response") or ""
         trace.event("self_test_chat_turn", ok=bool(said), agent_said=said[:200])
         if r.get("callId"):
-            try: freya.api("POST", "/api/v2/chat/end", {"callId": r["callId"]})
+            try: freya.api("POST", "/api/v2/chat/end", {"callId": r["callId"]}, retries=1)
             except Exception: pass
     except Exception as e:
         trace.event("self_test_chat_turn", ok=False, error=str(e)[:300])

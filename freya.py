@@ -9,21 +9,21 @@ URL = os.environ.get("FREYA_API_URL", "https://staging-app.freyavoice.ai")
 # Cloudflare rejects requests without a browser-like User-Agent (error 1010).
 HEADERS = {"Authorization": "Bearer " + os.environ.get("FREYA_API_KEY", ""), "Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (build-the-builder)"}
 
-def api(method, path, body=None, **params):
+def api(method, path, body=None, retries=12, **params):
     """Call the API and return the `result` part of its {success, data: {message, result}} envelope."""
     q = "?" + urllib.parse.urlencode(params) if params else ""
-    for attempt in range(12):         # transient platform errors (5xx, 429, network) are retried with back-off (about 3 minutes in all)
+    for attempt in range(retries):    # transient platform errors (5xx, 429, network) are retried with back-off (about 3 minutes in all)
         req = urllib.request.Request(URL + path + q, data=json.dumps(body).encode() if body is not None else None, headers=HEADERS, method=method)
         try:
             with urllib.request.urlopen(req, timeout=float(os.environ.get("FREYA_HTTP_TIMEOUT", "30"))) as r: out = json.load(r)
             break
         except urllib.error.HTTPError as e:
             msg = e.read().decode()[:1500]
-            if (e.code >= 500 or e.code == 429) and attempt < 11:
+            if (e.code >= 500 or e.code == 429) and attempt < retries - 1:
                 time.sleep(min(3 * (attempt + 1), 20)); continue
             raise RuntimeError(f"{method} {path} -> {e.code}: {msg}") from None
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
-            if attempt < 11:
+            if attempt < retries - 1:
                 time.sleep(min(3 * (attempt + 1), 20)); continue
             raise
     return out.get("data", {}).get("result", out) if isinstance(out, dict) else out
