@@ -1,0 +1,327 @@
+{
+ "bank_name": "NordLicht Kredit",
+ "language": "English",
+ "currency_word": "",
+ "call_variables": [
+  "customer_id",
+  "first_name",
+  "last_name",
+  "title",
+  "now"
+ ],
+ "lines": {
+  "opening": "Hello, this is the automated assistant of NordLicht Kredit. We record this call for quality purposes.",
+  "confirm_identity": "May I speak with {first_name} {last_name}?",
+  "ai_answer": "Yes, I am the automated assistant of NordLicht Kredit.",
+  "scam_answer": "This is a genuine call from NordLicht Kredit. If you prefer, you can also contact NordLicht Kredit through online banking.",
+  "identity_intro": "Before we continue, I need to ask you two security questions.",
+  "identity_failed": "I am sorry, I could not complete the security check. Please contact us through online banking.",
+  "identity_decline_explanation": "These two questions protect your data. I can only continue once they are answered.",
+  "debt_intro": "Thank you, {first_name} {last_name}. I am calling from NordLicht Kredit about an overdue payment.",
+  "debt_intro_multi": "Thank you, {first_name} {last_name}. I am calling from NordLicht Kredit about overdue payments on several facilities.",
+  "first_ask": "Can you pay the full overdue amount?",
+  "first_ask_multi": "Can you pay the full overdue amount on each of them?",
+  "full_offer": "Can you pay the full {amount} on {date}?",
+  "floor_offer": "Could you pay at least the {floor_name} of {amount} on {date}?",
+  "confirm_question": "Do you confirm?",
+  "promise_recorded": "Thank you, your arrangement is booked.",
+  "sms_sentence": "A confirmation letter will follow by post.",
+  "service_error": "I am sorry, I could not book the arrangement because of a technical problem.",
+  "already_paid": "Thank you for letting me know.",
+  "change_promise": "Of course. Let us go through the arrangement again.",
+  "condolence": "I am very sorry for your loss. Please accept my condolences.",
+  "no_info": "I am sorry, I do not have that information.",
+  "goodbye": "Thank you for your time. Goodbye."
+ },
+ "forbidden_before_verification": [
+  "arrears",
+  "overdue",
+  "debt",
+  "money",
+  "amount",
+  "payment",
+  "bank account",
+  "facility",
+  "overdraft",
+  "term loan",
+  "arrangement"
+ ],
+ "contact": {
+  "max_asks": 2,
+  "confirmations": [
+   "yes",
+   "speaking",
+   "that's me",
+   "this is he",
+   "this is she",
+   "it's me"
+  ],
+  "not_confirmations": [
+   "no",
+   "wrong number",
+   "he is not here",
+   "she is not here",
+   "who is asking",
+   "I don't know this person"
+  ]
+ },
+ "callback": {
+  "enabled": true,
+  "days": "next_business_day",
+  "window_start": "09:00",
+  "window_end": "18:00",
+  "must_be_after_now": true,
+  "min_minutes_after_now": 0,
+  "max_asks": 2
+ },
+ "identity": {
+  "field_param": "field",
+  "answer_param": "answer",
+  "questions": [
+   {
+    "field": "postcode",
+    "ask": "What is the postcode of your registered business address?",
+    "answer_format": "text",
+    "spoken_name": "postcode of the registered business address"
+   },
+   {
+    "field": "founded_year",
+    "ask": "In which year was your business founded?",
+    "answer_format": "year",
+    "spoken_name": "year the business was founded"
+   }
+  ],
+  "max_wrong_total": 3,
+  "numeric_date_order": "DMY",
+  "response": {
+   "answer_ok": "match",
+   "all_ok": "passed_all",
+   "remaining": "attempts_remaining",
+   "hint": "",
+   "ok": "ok"
+  },
+  "hints": [],
+  "decline_max": 2
+ },
+ "account": {
+  "products_field": "facilities",
+  "id_field": "facility_id",
+  "type_field": "kind",
+  "past_due_field": "overdue_amount",
+  "days_late_field": "days_in_arrears"
+ },
+ "product_types": {
+  "overdraft": {
+   "spoken": "overdraft on the account ending {iban_last4}",
+   "floor_field": "min_due",
+   "floor_name": "minimum due"
+  },
+  "term_loan": {
+   "spoken": "term loan",
+   "floor_field": "rate",
+   "floor_name": "rate"
+  }
+ },
+ "calendar": {
+  "business_weekdays": [
+   1,
+   2,
+   3,
+   4,
+   5
+  ],
+  "holidays": [
+   "2026-12-24",
+   "2026-12-25",
+   "2027-01-01"
+  ],
+  "next_weekday_rule": "following_week"
+ },
+ "bands": [
+  {
+   "name": "1-20 days in arrears",
+   "min_days_late": 1,
+   "max_days_late": 20,
+   "deadline": {
+    "type": "business_days_after_today",
+    "n": 10
+   },
+   "attempts": 1
+  },
+  {
+   "name": "21-60 days in arrears",
+   "min_days_late": 21,
+   "max_days_late": 60,
+   "deadline": {
+    "type": "business_days_after_today",
+    "n": 6
+   },
+   "attempts": 2
+  }
+ ],
+ "attempts": [
+  {
+   "number": 1,
+   "amount": "full",
+   "date": "last_business_day_this_week_or_next_if_today"
+  },
+  {
+   "number": 2,
+   "amount": "floor",
+   "date": "deadline"
+  }
+ ],
+ "promise_tool": {
+  "product_param": "facility_id",
+  "amount_param": "amount",
+  "date_param": "pay_on",
+  "ok_field": "ok"
+ },
+ "multi_product": true,
+ "notes": {
+  "enabled": false,
+  "tool": "add_note",
+  "product_param": "facility_id",
+  "reason_param": "reason",
+  "reasons": [],
+  "paid_reason": "",
+  "none_on_transfer": false
+ },
+ "transfer": {
+  "queue_param": "queue",
+  "queue_to_reason": {
+   "workout": "workout",
+   "desk": "desk",
+   "care": "care"
+  }
+ },
+ "close": {
+  "outcome_param": "status",
+  "reason_param": "sub_status",
+  "no_reason_outcomes": [
+   "arrangement",
+   "settled"
+  ]
+ },
+ "outcomes": [
+  {
+   "outcome": "arrangement",
+   "reason": "",
+   "when": "arrangement booked (ARR-01)",
+   "stage": "negotiate",
+   "role": "promise"
+  },
+  {
+   "outcome": "settled",
+   "reason": "",
+   "when": "customer already paid (PD-01)",
+   "stage": "negotiate",
+   "role": "paid"
+  },
+  {
+   "outcome": "handed_over",
+   "reason": "workout",
+   "when": "restructuring request, transferred to queue workout (TR-01)",
+   "stage": "negotiate",
+   "role": "transferred"
+  },
+  {
+   "outcome": "handed_over",
+   "reason": "desk",
+   "when": "asked for a person after one offer to help, queue desk (TR-02)",
+   "stage": "any",
+   "role": "transferred"
+  },
+  {
+   "outcome": "handed_over",
+   "reason": "care",
+   "when": "hardship customer accepts welfare team, queue care (TR-03)",
+   "stage": "negotiate",
+   "role": "transferred"
+  },
+  {
+   "outcome": "no_arrangement",
+   "reason": "declined",
+   "when": "refused / persuasion attempts used up (NP-01)",
+   "stage": "negotiate",
+   "role": "refused"
+  },
+  {
+   "outcome": "no_arrangement",
+   "reason": "hardship",
+   "when": "hardship, welfare team declined (NP-02)",
+   "stage": "negotiate",
+   "role": "hardship"
+  },
+  {
+   "outcome": "no_arrangement",
+   "reason": "contested",
+   "when": "customer disputes the debt (NP-03)",
+   "stage": "negotiate",
+   "role": "dispute"
+  },
+  {
+   "outcome": "no_arrangement",
+   "reason": "system_fault",
+   "when": "booking failed twice (NP-05)",
+   "stage": "negotiate",
+   "role": "service_error"
+  },
+  {
+   "outcome": "unverified",
+   "reason": "failed_check",
+   "when": "third wrong security answer (NV-01)",
+   "stage": "identity",
+   "role": "id_failed"
+  },
+  {
+   "outcome": "unverified",
+   "reason": "refused_check",
+   "when": "will not answer after one explanation (NV-02)",
+   "stage": "identity",
+   "role": "id_declined"
+  },
+  {
+   "outcome": "not_contacted",
+   "reason": "callback_booked",
+   "when": "callback booked with someone else (NR-01)",
+   "stage": "third_party",
+   "role": "callback"
+  },
+  {
+   "outcome": "not_contacted",
+   "reason": "no_time",
+   "when": "no callback time in window after asking twice (NR-02)",
+   "stage": "third_party",
+   "role": "no_callback"
+  },
+  {
+   "outcome": "not_contacted",
+   "reason": "unknown_number",
+   "when": "number not known to them (NR-03)",
+   "stage": "contact",
+   "role": "wrong_number"
+  },
+  {
+   "outcome": "not_contacted",
+   "reason": "bereavement",
+   "when": "account holder passed away (NR-04)",
+   "stage": "contact",
+   "role": "deceased"
+  },
+  {
+   "outcome": "not_contacted",
+   "reason": "unclear",
+   "when": "could not tell who answered (NR-05)",
+   "stage": "contact",
+   "role": "unclear"
+  }
+ ],
+ "rules_text": {
+  "global": "- Introduce yourself as the automated assistant of NordLicht Kredit and say: \"We record this call for quality purposes.\"\n- Customers are small business owners (sole traders).\n- Be honest; never invent terms, amounts, dates or rules.\n- Never mention arrears, money, amounts, the bank account or any facility before both security questions are passed.\n- If asked whether you are a robot, say ai_answer. If asked whether this is a scam, say scam_answer.\n- If the customer asks for a person: offer to help once; if they still want a person, call transfer_to_agent with queue \"desk\" and end as desk.\n- If a tool returns a service failure (500), nothing was recorded and the call may be repeated.\n- close_call is always the last tool call: status from the outcome table, sub_status required except for arrangement and settled.",
+  "contact": "- Ask: \"May I speak with {first_name} {last_name}?\" Ask at most 2 times.\n- If the account holder confirms, go to the security check.\n- If someone else answers, go to the third-party step.\n- If the number is not known to them, end as unknown_number.\n- If the account holder has passed away, say condolence, then end as bereavement.\n- If you cannot tell who answered after 2 asks, end as unclear.",
+  "third_party": "- Do not leave any message about the reason for the call; never mention arrears, money, the account or any facility.\n- Ask for a good time to call back the account holder.\n- Callbacks are booked for the next business day only (Monday to Friday, not 2026-12-24, 2026-12-25, 2027-01-01), between 09:00 and 18:00 inclusive.\n- Book it with schedule_callback (date YYYY-MM-DD, time HH:MM), then end as callback_booked.\n- If the person cannot give a time in that window after being asked twice, end as no_time.",
+  "identity": "- Say identity_intro, then ask two questions in this order: the postcode of the registered business address (verify_identity field \"postcode\"), then the year the business was founded (verify_identity field \"founded_year\").\n- Pass the answer in \"answer\"; read \"match\" (this answer correct), \"passed_all\" (all passed) and \"attempts_remaining\".\n- If ok is false (unreadable answer), it is not counted as wrong: ask the same question again.\n- Up to two wrong answers in total are tolerated: after a wrong answer, ask the same question again.\n- The third wrong answer ends the check: say identity_failed (refer to online banking), then end as failed_check.\n- If the customer will not answer, explain once with identity_decline_explanation; if they still will not answer, end as refused_check.\n- When passed_all is true, call get_account.",
+  "negotiate": "- Call get_account and take the facilities list. For each facility use facility_id, kind, overdue_amount and days_in_arrears.\n- Band by days_in_arrears: 1-20 days -> deadline = 10th business day after today, 1 persuasion attempt; 21-60 days -> deadline = 6th business day after today, 2 persuasion attempts.\n- Business days are Monday to Friday; bank holidays 2026-12-24, 2026-12-25, 2027-01-01 (2026-12-31 is a business day). Never agree a date on a weekend, a holiday, in the past or after the deadline.\n- Lowest acceptable amount (floor): min_due for overdrafts, rate for term loans. Never accept less than the floor.\n- Step 1: say debt_intro (debt_intro_multi for several facilities) with the facility details, then always ask for the full overdue amount first (first_ask). If the customer agrees to pay at least the floor on a business day no later than the deadline, go to confirmation.\n- Step 2 (attempt 1, all bands): if refused, offer the full overdue_amount on the last business day of the current week; if today is that day, the last business day of the following week (full_offer).\n- Step 3 (attempt 2, 21-60 days only): if still refused, offer the floor amount on the deadline (floor_offer).\n- Never repeat an offer. When the band's attempts are used up without agreement, end as declined.\n- Already paid: say already_paid, no arrangement, end as settled.\n- Customer disputes the debt: no arrangement, end as contested.\n- Hardship: no arrangement; offer the welfare team. If accepted, call transfer_to_agent with queue \"care\" and end as care; if declined, end as hardship.\n- Request for restructuring: call transfer_to_agent with queue \"workout\" and end as workout.\n- Confirmation: read the arrangement back (facility, amount, date), ask confirm_question and get an explicit yes before booking.\n- Book with create_promise (facility_id, amount, pay_on as YYYY-MM-DD), one per facility. If ok is true, say promise_recorded, then say: \"A confirmation letter will follow by post.\"\n- If booking fails, try once more; if booking fails twice, say service_error and end as system_fault.\n- Several facilities: go through each facility in turn with its own band, offers and one create_promise each; end as arrangement when an arrangement was booked."
+ }
+}

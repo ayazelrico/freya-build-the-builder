@@ -5,7 +5,7 @@ sys.path.insert(0, str(ROOT))
 from builder import generate
 from tests.test_runtime import node_code, tool, run
 
-spec = json.load(open(ROOT / "out/fake-c.spec.json")); wf = generate.build(spec, json.load(open(ROOT / "fixtures/fake/openapi-c.json")))
+spec = json.load(open(ROOT / "fixtures/fake/brief-c.llm-spec.json")); wf = generate.build(spec, json.load(open(ROOT / "fixtures/fake/openapi-c.json")))
 v = {"customer_id": "c_x", "first_name": "Ana", "last_name": "Weiss", "title": "Ms", "now": "2026-12-21T10:00"}
 run(node_code(wf, "setup"), v); print(v["callback_facts"])
 prods = [{"facility_id": "f1", "kind": "overdraft", "iban_last4": "7781", "overdue_amount": 900, "days_in_arrears": 30, "min_due": 150},
