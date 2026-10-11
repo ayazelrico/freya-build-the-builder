@@ -79,7 +79,9 @@ General rules
   },                                   // {field} in "spoken" inserts a field of the product record
 
   "calendar": {"business_weekdays": [1,2,3,4,5], "holidays": ["YYYY-MM-DD"],      // ISO weekday numbers, Monday = 1
-               "next_weekday_rule": "following_week"},   // "next Friday" = Friday of the following calendar week (following_week)
+               "next_weekday_rule": "following_week",
+               "non_business_day": "next_business_day",  // what to offer for a weekend/holiday: next_business_day | previous_business_day | refuse
+               "after_deadline": "offer_deadline"},      // a day after the deadline: offer_deadline | refuse   // "next Friday" = Friday of the following calendar week (following_week)
                                                          // or the next Friday to come (next_occurrence); following_week if the brief is silent
 
   "bands": [                           // how late -> deadline and number of persuasion attempts

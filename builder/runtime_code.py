@@ -385,11 +385,21 @@ try:
             if d > dl:
                 acts.append(who + 'after the deadline, say the latest date you can record is ' + say_date(dl) + ' and offer that')
             elif not is_bd(d):
-                nb = next_bd(d)
-                if nb > dl:
-                    acts.append(who + 'not a business day; offer ' + say_date(dl) + ', the latest date you can record')
+                pol = (DATA.get('calendar') or dict()).get('non_business_day') or 'next_business_day'
+                kind = 'holiday' if d.isoformat() in HOL else 'weekend'
+                if pol == 'refuse':
+                    acts.append(who + 'not a business day (' + kind + '); it cannot be recorded')
+                elif pol == 'previous_business_day':
+                    pb = d - datetime.timedelta(days=1)
+                    while not is_bd(pb):
+                        pb = pb - datetime.timedelta(days=1)
+                    acts.append(who + 'not a business day (' + kind + '); offer the previous business day, ' + say_date(max(pb, bd_on_or_after(today))))
                 else:
-                    acts.append(who + 'not a business day (' + ('holiday' if d.isoformat() in HOL else 'weekend') + '); offer the next business day, ' + say_date(nb) + ' (' + nb.isoformat() + ')')
+                    nb = next_bd(d)
+                    if nb > dl:
+                        acts.append(who + 'not a business day; offer ' + say_date(dl) + ', the latest date you can record')
+                    else:
+                        acts.append(who + 'not a business day (' + kind + '); offer the next business day, ' + say_date(nb) + ' (' + nb.isoformat() + ')')
             else:
                 acts.append(who + 'OK, can be recorded')
         F.append('- ' + say_date(d) + ' (' + d.isoformat() + ')' + (' = today' if d == today else '') + ': ' + '; '.join(acts))
@@ -867,12 +877,16 @@ ORD = dict(first=1, second=2, third=3, fourth=4, fifth=5, sixth=6, seventh=7, ei
 UNITS = dict(one=1, two=2, three=3, four=4, five=5, six=6, seven=7, eight=8, nine=9)
 WD = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
+CARD = dict(one=1, two=2, three=3, four=4, five=5, six=6, seven=7, eight=8, nine=9, ten=10, eleven=11, twelve=12,
+            thirteen=13, fourteen=14, fifteen=15, sixteen=16, seventeen=17, eighteen=18, nineteen=19, twenty=20, thirty=30)
+
 def words_to_digits(t):
+    # 'twenty-sixth' / 'twenty six' / 'thirty first' -> 26 / 26 / 31; then single ordinal and cardinal words
+    units = [(w, n) for w, n in list(ORD.items()) + list(CARD.items()) if n < 10]
     for tens, base in (('twenty', 20), ('thirty', 30)):
-        for w, n in list(ORD.items()) + [(k + 'th', v) for k, v in UNITS.items()]:
-            if n < 10:
-                t = re.sub(r'\b' + tens + r'[\s-]+' + w + r'\b', str(base + n), t)
-    for w, n in sorted(ORD.items(), key=lambda x: -len(x[0])):
+        for w, n in units:
+            t = re.sub(r'\b' + tens + r'[\s-]+' + w + r'\b', str(base + n), t)
+    for w, n in sorted(list(ORD.items()) + list(CARD.items()), key=lambda x: -len(x[0])):
         t = re.sub(r'\b' + w + r'\b', str(n), t)
     return t
 
@@ -932,6 +946,8 @@ def spoken_day(text, today, next_rule):
         return d, ''
     return None, 'vague'
 
+CALP = DATA.get('calendar') or dict()
+
 def check(params):
     n = now_dt()
     today = n.date()
@@ -956,17 +972,33 @@ def check(params):
         who = (p['spoken'] + ': ') if len(chosen) > 1 else ''
         if day_text:
             if d is None:
-                out.append(who + 'no exact day was named. Ask once for the exact day; if they still give none, propose the deadline ' + say_date(dl) + '.')
+                if re.search(r'\d|' + '|'.join(MONTHS), words_to_digits(day_text.lower())):
+                    out.append(who + 'the day could not be read. Ask the customer to say it as day and month, for example the 23rd of October.')
+                else:
+                    out.append(who + 'no exact day was named (a vague period). Apply the rule for vague periods; the latest date you can record is ' + say_date(dl) + '.')
             elif d < today:
                 out.append(who + say_date(d) + ' is in the past. Ask for a day from today on.')
             elif d > dl:
-                out.append(who + say_date(d) + ' is after the deadline. Say the latest date you can record is ' + say_date(dl) + ' and offer ' + say_date(dl) + '.')
+                if CALP.get('after_deadline') == 'refuse':
+                    out.append(who + say_date(d) + ' is after the latest date that can be recorded (' + say_date(dl) + '). It cannot be recorded; apply the rules for dates after the deadline.')
+                else:
+                    out.append(who + say_date(d) + ' is after the deadline. Say the latest date you can record is ' + say_date(dl) + ' and offer ' + say_date(dl) + '.')
             elif not is_bd(d):
-                nb = bd_on_or_after(d)
-                if nb > dl:
-                    nb = dl
                 why = 'a holiday' if d.isoformat() in HOL else 'not a business day'
-                out.append(who + say_date(d) + ' is ' + why + '. Offer the next business day, ' + say_date(nb) + ' (' + nb.isoformat() + ').')
+                if CALP.get('non_business_day') == 'previous_business_day':
+                    nb = d - datetime.timedelta(days=1)
+                    while not is_bd(nb):
+                        nb = nb - datetime.timedelta(days=1)
+                    if nb < today:
+                        nb = bd_on_or_after(today)
+                    out.append(who + say_date(d) + ' is ' + why + '. Offer the previous business day, ' + say_date(nb) + ' (' + nb.isoformat() + ').')
+                elif CALP.get('non_business_day') == 'refuse':
+                    out.append(who + say_date(d) + ' is ' + why + ' and cannot be recorded. Ask for a business day.')
+                else:
+                    nb = bd_on_or_after(d)
+                    if nb > dl:
+                        nb = dl
+                    out.append(who + say_date(d) + ' is ' + why + '. Offer the next business day, ' + say_date(nb) + ' (' + nb.isoformat() + ').')
             else:
                 out.append(who + say_date(d) + ' (' + d.isoformat() + ') is fine and can be recorded.')
         if amt is not None:

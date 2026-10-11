@@ -127,8 +127,12 @@ def test_check_payment():
              ("2026-10-27", "p1", "2026-10-27", "fine"),
              ("October 6th", "p1", "2026-10-06", "in the past"),
              ("Monday the twenty sixth", "p1", "2026-10-26", "Tuesday 27"),
-             ("next week", "p1", "", "no exact day"),
-             ("when my salary comes", "p1", "", "no exact day")]
+             ("thirty October", "", "2026-10-30", "after the deadline"),
+             ("twenty three October", "p2", "2026-10-23", "fine"),
+             ("the twenty-first", "p1", "2026-10-21", "fine"),
+             ("thirty first of October", "p1", "2026-10-31", "not a business day"),
+             ("next week", "p1", "", "vague period"),
+             ("when my salary comes", "p1", "", "vague period")]
     for words, prod, want, phrase in cases:
         r = run_tool(code, v, {"day": words, "product": prod})
         ok = r["day"] == want and phrase in r["what_to_do_next"]
