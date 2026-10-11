@@ -56,6 +56,14 @@ def smoke_test(workflow_id, wf, trace):
         trace.event("self_test_chat_turn", ok=False, error=str(e)[:300])
 
 
+def is_tool_api(text):
+    try:
+        d = json.loads(text)
+    except Exception:
+        return False
+    return isinstance(d, dict) and ("openapi" in d or "swagger" in d or "paths" in d)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("briefs", nargs="+")
@@ -64,16 +72,35 @@ def main():
     ap.add_argument("--spec", help="use this SPEC file instead of extracting one (for testing the generator)")
     ap.add_argument("--no-save", action="store_true", help="build and validate only")
     a = ap.parse_args()
-    # A .json among the positional arguments is the tool API file (the form's "{brief_path} {tool_api_path}").
-    apis = [b for b in a.briefs if b.lower().endswith(".json")]
+    # Positional inputs: brief files, folders of brief material (a mail, a policy extract, a memo, a code list...)
+    # and the tool API file. The tool API file is recognised by its content, not by its extension.
+    files, a.raw_inputs = [], list(a.briefs)
+    for b in a.briefs:
+        pth = pathlib.Path(b)
+        files += sorted(x for x in pth.rglob("*") if x.is_file() and not x.name.startswith(".")) if pth.is_dir() else [pth]
+    briefs, apis, skipped = [], [], []
+    for pth in files:
+        try:
+            text = pth.read_text(encoding="utf-8", errors="replace")
+        except Exception as e:
+            skipped.append(f"{pth}: {e}"); continue
+        if "\x00" in text[:2000]:
+            skipped.append(f"{pth}: binary file"); continue
+        if pth.suffix.lower() in (".json", ".yaml", ".yml") and is_tool_api(text):
+            apis.append(str(pth))
+        else:
+            briefs.append(str(pth))
     if apis:
         a.openapi = apis[-1]
-        a.briefs = [b for b in a.briefs if not b.lower().endswith(".json")]
+    a.briefs, a.skipped = briefs, skipped
+    if not a.briefs:
+        sys.exit("no brief file found in the inputs")
 
-    slot = a.slot or pathlib.Path(a.briefs[-1]).stem
+    first_dir = [b for b in a.raw_inputs if pathlib.Path(b).is_dir()]
+    slot = a.slot or (pathlib.Path(first_dir[0]).name if first_dir else pathlib.Path(a.briefs[-1]).stem)
     out = ROOT / "out"; out.mkdir(exist_ok=True)
     trace = Trace(ROOT / "traces" / f"{slot}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl")
-    trace.event("inputs", briefs=a.briefs, openapi=a.openapi, slot=slot)
+    trace.event("inputs", briefs=a.briefs, openapi=a.openapi, slot=slot, skipped=a.skipped)
     openapi_text = pathlib.Path(a.openapi).read_text()
 
     if a.spec:
@@ -81,7 +108,7 @@ def main():
         trace.event("spec_loaded", path=a.spec)
     else:
         from builder.extract import extract_spec
-        spec = extract_spec([(pathlib.Path(b).name, pathlib.Path(b).read_text()) for b in a.briefs], openapi_text, trace)
+        spec = extract_spec([(pathlib.Path(b).name, pathlib.Path(b).read_text(encoding="utf-8", errors="replace")) for b in a.briefs], openapi_text, trace)
     (out / f"{slot}.spec.json").write_text(json.dumps(spec, indent=1))
     trace.event("spec_written", path=f"out/{slot}.spec.json", outcomes=len(spec.get("outcomes") or []))
 

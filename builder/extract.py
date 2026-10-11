@@ -116,7 +116,8 @@ def extract_spec(brief_texts, openapi_text, trace):
     briefs = "\n\n".join(f"<brief file=\"{name}\">\n{text}\n</brief>" for name, text in brief_texts)
     base = f"{schema}\n\n<tool_api>\n{openapi_text}\n</tool_api>\n\n{briefs}\n\n"
     if len(brief_texts) > 1:
-        base += "The later briefs build on the earlier ones: every earlier rule applies unless a later one replaces it.\n\n"
+        base += ("These files together form one brief (for example a base brief and an addendum, or a mail, a policy extract, a memo and a code list). "
+                 "Every rule applies unless later material, such as a memo or an addendum, replaces it.\n\n")
     try:
         spec = _ask(trace, "extract the SPEC from the brief", base, "Write the SPEC for these briefs.")
     except (json.JSONDecodeError, ValueError):
