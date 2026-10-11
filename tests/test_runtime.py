@@ -125,6 +125,8 @@ def test_check_payment():
              ("the sixth of November", "p2", "2026-11-06", "Friday 23 October"),
              ("30 October", "", "2026-10-30", "after the deadline"),
              ("2026-10-27", "p1", "2026-10-27", "fine"),
+             ("October 6th", "p1", "2026-10-06", "in the past"),
+             ("Monday the twenty sixth", "p1", "2026-10-26", "Tuesday 27"),
              ("next week", "p1", "", "no exact day"),
              ("when my salary comes", "p1", "", "no exact day")]
     for words, prod, want, phrase in cases:

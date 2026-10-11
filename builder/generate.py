@@ -210,7 +210,8 @@ def build(spec, openapi):
         "Call at most one tool per message. When a rule says to call a tool, call it; saying you did is not enough. "
         "A transfer is always a tool call on its own: never call another tool in the same message as transfer_to_agent, and never write notes when you transfer.\n"
         "Never say goodbye yourself: to end the call, call the matching end tool and the closing words are spoken for you.\n"
-        "Customers talk like people. If they give a number or a date in parts, wait for the rest and use the whole value. "
+        "Customers talk like people. If they give a number or a date in parts, wait for the rest and use the whole value: the parts go together in the order the customer said them "
+        "(first part first). Ask 'And the rest?', never for 'the first digits'. A bare number like 'twenty' may be the start of 'twenty-sixth' or 'twenty-five', so wait for the rest. "
         "If they correct themselves ('the 21st, sorry, the 20th'), use only the corrected value. Amounts and dates said in words count like digits. "
         "If they ask a question back or talk about something else, answer briefly and return to your question. "
         "A date they mention that is not about paying (a wedding, a birthday) is not a payment date.\n"
@@ -328,7 +329,7 @@ def build(spec, openapi):
         "description": "Check a payment day and/or amount against the bank's rules. CALL it every time the customer names a day or an amount, "
                        "BEFORE you answer them, then say what its what_to_do_next says.",
         "parameters": {"type": "object", "properties": {
-            "day": {"type": "string", "description": "The payment day exactly in the customer's words (e.g. 'Monday the 26th', 'next Friday', 'tomorrow'). Empty if none."},
+            "day": {"type": "string", "description": "The payment day exactly in the customer's words, all pieces joined in the order they were said (e.g. 'Monday the twenty sixth', 'next Friday', 'tomorrow'). Empty if none."},
             "amount": {"type": "string", "description": "The amount the customer proposed, as a number. Empty if none."},
             "product": {"type": "string", "description": "Which product it is for (product_id from the facts). Empty for all products."},
             "code": {"type": "string", "default": rc.fill(rc.CHECK_PAYMENT, data)}},

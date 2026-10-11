@@ -911,8 +911,8 @@ def spoken_day(text, today, next_rule):
                 d = datetime.date(y, m, day)
             except Exception:
                 continue
-            if d >= today:
-                cands.append(d)
+            if d >= today or (mo and k == 0):
+                cands.append(d)   # a named month this year that is already past stays in the past (it is not next year)
         if cands:
             note = ''
             if wd is not None and cands[0].weekday() != wd:
