@@ -1,1 +1,4 @@
 anthropic>=0.40
+python-docx
+pypdf
+openpyxl

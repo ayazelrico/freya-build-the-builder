@@ -6,7 +6,7 @@
 Steps: brief -> SPEC (Claude) -> workflow (deterministic code) -> dry-run validation -> save + publish on Freya
 -> export. Every step is written to traces/<slot>-<time>.jsonl.
 """
-import argparse, json, os, pathlib, sys, time
+import argparse, json, os, pathlib, re, sys, time
 
 ROOT = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -56,12 +56,75 @@ def smoke_test(workflow_id, wf, trace):
         trace.event("self_test_chat_turn", ok=False, error=str(e)[:300])
 
 
+def doc_text(pth):
+    """Text of a brief document. Word, PDF and Excel are converted; tables keep one row per line."""
+    suf = pth.suffix.lower()
+    if suf == ".docx":
+        import docx
+        d = docx.Document(str(pth))
+        out = [p.text for p in d.paragraphs if p.text.strip()]
+        for ti, t in enumerate(d.tables):
+            out.append(f"[table {ti + 1}]")
+            out += [" | ".join(c.text.strip() for c in row.cells) for row in t.rows]
+        return "\n".join(out)
+    if suf == ".pdf":
+        import pypdf
+        return "\n".join((pg.extract_text() or "") for pg in pypdf.PdfReader(str(pth)).pages)
+    if suf in (".xlsx", ".xlsm"):
+        import openpyxl
+        wb = openpyxl.load_workbook(str(pth), data_only=True, read_only=True)
+        out = []
+        for ws in wb.worksheets:
+            out.append(f"[sheet {ws.title}]")
+            for row in ws.iter_rows(values_only=True):
+                if any(v is not None and str(v).strip() for v in row):
+                    out.append(" | ".join("" if v is None else str(v) for v in row))
+        return "\n".join(out)
+    return pth.read_text(encoding="utf-8", errors="replace")
+
+
 def is_tool_api(text):
     try:
         d = json.loads(text)
     except Exception:
         return False
     return isinstance(d, dict) and ("openapi" in d or "swagger" in d or "paths" in d)
+
+
+def detect_language(texts):
+    t = " ".join(texts)[:200000]
+    tr = sum(t.count(c) for c in "ğşıİĞŞ")
+    return "Turkish" if tr > 50 else "English"
+
+
+def general_mode(a, slot, trace):
+    """Cases outside the collections pattern: Claude writes the workflow from the documents (builder/llm_workflow.py)."""
+    from builder import llm_workflow
+    docs = [(str(pathlib.Path(b).name), a.texts[b]) for b in a.briefs]
+    lang = detect_language([t for _, t in docs])
+    trace.event("general_mode", documents=len(docs), mock_url=a.mock_url, language=lang)
+
+    def validate(wf):
+        try:
+            freya.validate_workflow(slot, wf); return ""
+        except Exception as e:
+            return str(e)
+    wf = llm_workflow.write_workflow(docs, a.mock_url, trace, validate)
+    out = ROOT / "out"; out.mkdir(exist_ok=True)
+    (out / f"{slot}.workflow.json").write_text(json.dumps(wf, indent=1))
+    n_tools = sum(len(n.get("tools") or []) + len(n.get("pre_actions") or []) for n in wf["nodes"].values()) + len(wf.get("tools") or [])
+    trace.event("workflow_generated", steps=len(wf["nodes"]), tools=n_tools, bytes=len(json.dumps(wf)))
+    ids = freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json"))
+    trace.event("saved_on_freya", **ids)
+    tune_agent_config(ids["workflow_id"], {"language": lang}, trace)
+    smoke_test(ids["workflow_id"], wf, trace)
+    path = freya.export_workflow(ids["workflow_id"], str(out / f"{slot}.export.workflow.json"))
+    sub = ROOT / "submission"; sub.mkdir(exist_ok=True)
+    (sub / f"{slot}.workflow.json").write_text(pathlib.Path(path).read_text())
+    trace.event("exported", path=path, submission=f"submission/{slot}.workflow.json", workflow_id=ids["workflow_id"],
+                agent_id=ids["agent_id"], steps=len(wf["nodes"]), tools=n_tools)
+    print(json.dumps(ids))
+    trace.close(slot=slot)
 
 
 def main():
@@ -74,25 +137,29 @@ def main():
     a = ap.parse_args()
     # Positional inputs: brief files, folders of brief material (a mail, a policy extract, a memo, a code list...)
     # and the tool API file. The tool API file is recognised by its content, not by its extension.
+    a.mock_url = next((b.rstrip("/") for b in a.briefs if re.match(r"^https?://", b)), "")
+    a.briefs = [b for b in a.briefs if not re.match(r"^https?://", b)]
     files, a.raw_inputs = [], list(a.briefs)
     for b in a.briefs:
         pth = pathlib.Path(b)
         files += sorted(x for x in pth.rglob("*") if x.is_file() and not x.name.startswith(".")) if pth.is_dir() else [pth]
-    briefs, apis, skipped = [], [], []
+    briefs, apis, skipped, texts = [], [], [], {}
     for pth in files:
         try:
-            text = pth.read_text(encoding="utf-8", errors="replace")
+            text = doc_text(pth)
         except Exception as e:
             skipped.append(f"{pth}: {e}"); continue
         if "\x00" in text[:2000]:
             skipped.append(f"{pth}: binary file"); continue
+        texts[str(pth)] = text
         if pth.suffix.lower() in (".json", ".yaml", ".yml") and is_tool_api(text):
             apis.append(str(pth))
         else:
             briefs.append(str(pth))
     if apis:
         a.openapi = apis[-1]
-    a.briefs, a.skipped = briefs, skipped
+    a.has_api = bool(apis)
+    a.briefs, a.skipped, a.texts = briefs, skipped, texts
     if not a.briefs:
         sys.exit("no brief file found in the inputs")
 
@@ -103,12 +170,14 @@ def main():
     trace.event("inputs", briefs=a.briefs, openapi=a.openapi, slot=slot, skipped=a.skipped)
     openapi_text = pathlib.Path(a.openapi).read_text()
 
+    if not a.has_api and a.mock_url:
+        return general_mode(a, slot, trace)
     if a.spec:
         spec = json.loads(pathlib.Path(a.spec).read_text())
         trace.event("spec_loaded", path=a.spec)
     else:
         from builder.extract import extract_spec
-        spec = extract_spec([(pathlib.Path(b).name, pathlib.Path(b).read_text(encoding="utf-8", errors="replace")) for b in a.briefs], openapi_text, trace)
+        spec = extract_spec([(pathlib.Path(b).name, a.texts[b]) for b in a.briefs], openapi_text, trace)
     (out / f"{slot}.spec.json").write_text(json.dumps(spec, indent=1))
     trace.event("spec_written", path=f"out/{slot}.spec.json", outcomes=len(spec.get("outcomes") or []))
 
