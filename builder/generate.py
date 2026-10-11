@@ -322,7 +322,17 @@ def build(spec, openapi):
                        "condition": cond_eq("promises_all", "yes")})
     ends = [r for r in neg_rows if role(r) != "transferred"]
     neg_tr += [end_transition(spec, r) for r in ends]
-    neg_tools = [promise] + ([note] if note else []) + ([transfer] if transfer else [])
+    check_tool = {"type": "function", "config": {"timeoutMs": 10000}, "function": {
+        "name": "check_payment", "handler": "__function__:code_exec",
+        "description": "Check a payment day and/or amount against the bank's rules. CALL it every time the customer names a day or an amount, "
+                       "BEFORE you answer them, then say what its what_to_do_next says.",
+        "parameters": {"type": "object", "properties": {
+            "day": {"type": "string", "description": "The payment day exactly in the customer's words (e.g. 'Monday the 26th', 'next Friday', 'tomorrow'). Empty if none."},
+            "amount": {"type": "string", "description": "The amount the customer proposed, as a number. Empty if none."},
+            "product": {"type": "string", "description": "Which product it is for (product_id from the facts). Empty for all products."},
+            "code": {"type": "string", "default": rc.fill(rc.CHECK_PAYMENT, data)}},
+            "required": []}}}
+    neg_tools = [check_tool, promise] + ([note] if note else []) + ([transfer] if transfer else [])
     multi_text = ""
     if spec.get("multi_product"):
         multi_text = ("\nSEVERAL PRODUCTS: the facts list them in order. Follow the multi-product rules below. "
@@ -335,7 +345,8 @@ def build(spec, openapi):
         "The customer is verified. You have just stated the debt and asked the first question. Now get a payment promise under the rules.\n\n"
         "FACTS (computed by the bank; trust them over your own date arithmetic):\n{{negotiation_facts}}\n\n"
         "RULES:\n" + (R.get("negotiate") or "") + multi_text + note_text +
-        "\n\nDATES: whenever the customer names a day, look it up in DATE LOOKUP and do what its line says. Never compute dates yourself.\n"
+        "\n\nDATES AND AMOUNTS: whenever the customer names a payment day or an amount, CALL check_payment first (day in their own words, amount, product) and answer with what its what_to_do_next says. "
+        "Never judge a day or an amount yourself; DATE LOOKUP in the facts is only a backup if the tool fails.\n"
         "OFFERS: for a refusal or a non-answer use the product's OFFER SEQUENCE, in order, each offer once. Ask whether they can pay today only once in the whole call.\n"
         "SPECIAL SITUATIONS FIRST: as soon as the customer mentions a situation the rules handle specially (hardship such as illness, job loss or a death; a dispute; already paid; "
         "a request for a new plan or a person), apply that rule at once. It takes priority over the offer sequence: make no further offers unless the rule allows them.\n"

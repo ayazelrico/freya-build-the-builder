@@ -97,3 +97,44 @@ def test_note_check():
 
 
 test_note_check()
+
+
+def run_tool(code, vars, params):
+    g = {}
+    exec("def _f(vars, params):\n" + "\n".join("    " + ln for ln in code.split("\n")), g)
+    return g["_f"](vars, params)
+
+
+def test_check_payment():
+    spec = json.load(open(ROOT / "fixtures/brief-ab.llm-spec.json")); wf = generate.build(spec, json.load(open(ROOT / "tools/openapi.json")))
+    code = [t for t in wf["nodes"]["negotiate"]["tools"] if t["function"]["name"] == "check_payment"][0]["function"]["parameters"]["properties"]["code"]["default"]
+    v = {"customer_id": "c", "first_name": "S", "last_name": "O", "title": "Mr", "now": "2026-10-14T11:00"}   # a Wednesday
+    prods = [{"product_id": "p1", "type": "personal_loan", "past_due": 540, "days_late": 5, "instalment_amount": 180},
+             {"product_id": "p2", "type": "personal_loan", "past_due": 900, "days_late": 20, "instalment_amount": 300}]
+    for i, p in enumerate(prods):
+        for k, x in p.items(): v[f"load_account_response.data.products.{i}.{k}"] = x
+    run(node_code(wf, "compute"), v)
+    cases = [("Monday the 26th", "p1", "2026-10-26", "next business day, Tuesday 27"),
+             ("the twenty-sixth", "p1", "2026-10-26", "Tuesday 27"),
+             ("Monday the 25th, I mean Monday the 26th", "p1", "2026-10-26", "Tuesday 27"),
+             ("next Friday", "p1", "2026-10-23", "fine"),
+             ("this Friday", "p1", "2026-10-16", "fine"),
+             ("Friday", "p1", "2026-10-16", "fine"),
+             ("tomorrow", "p1", "2026-10-15", "fine"),
+             ("6 November", "p2", "2026-11-06", "after the deadline"),
+             ("the sixth of November", "p2", "2026-11-06", "Friday 23 October"),
+             ("30 October", "", "2026-10-30", "after the deadline"),
+             ("2026-10-27", "p1", "2026-10-27", "fine"),
+             ("next week", "p1", "", "no exact day"),
+             ("when my salary comes", "p1", "", "no exact day")]
+    for words, prod, want, phrase in cases:
+        r = run_tool(code, v, {"day": words, "product": prod})
+        ok = r["day"] == want and phrase in r["what_to_do_next"]
+        print(("ok  " if ok else "BAD ") + f"{words!r:45} -> {r['day']:10} | {r['what_to_do_next'][:150]}")
+        assert ok
+    for amt, phrase in (("410", "acceptable"), ("100", "below"), ("600", "more than"), ("180", "acceptable")):
+        r = run_tool(code, v, {"amount": amt, "product": "p1"}); print(amt, "->", r["what_to_do_next"][:120]); assert phrase in r["what_to_do_next"]
+    print("CHECK PAYMENT OK")
+
+
+test_check_payment()

@@ -135,7 +135,8 @@
    "2026-11-26",
    "2026-12-25",
    "2027-01-01"
-  ]
+  ],
+  "next_weekday_rule": "following_week"
  },
  "bands": [
   {

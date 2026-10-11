@@ -78,7 +78,9 @@ General rules
     "<type value>": {"spoken": "credit card ending {card_last4}", "floor_field": "<field holding the lowest acceptable amount>", "floor_name": "minimum payment"}
   },                                   // {field} in "spoken" inserts a field of the product record
 
-  "calendar": {"business_weekdays": [1,2,3,4,5], "holidays": ["YYYY-MM-DD"]},   // ISO weekday numbers, Monday = 1
+  "calendar": {"business_weekdays": [1,2,3,4,5], "holidays": ["YYYY-MM-DD"],      // ISO weekday numbers, Monday = 1
+               "next_weekday_rule": "following_week"},   // "next Friday" = Friday of the following calendar week (following_week)
+                                                         // or the next Friday to come (next_occurrence); following_week if the brief is silent
 
   "bands": [                           // how late -> deadline and number of persuasion attempts
     {"name": "...", "min_days_late": 1, "max_days_late": 10,

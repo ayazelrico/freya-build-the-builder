@@ -844,7 +844,8 @@ def fill(code, data, **subs):
 def check_code(code):
     if "{{" in code or "}}" in code:
         raise ValueError("generated code contains a double brace")
-    compile(code, "<snippet>", "exec")
+    body = "def _wrapped(vars, params):\n" + "\n".join("    " + ln for ln in code.split("\n"))
+    compile(body if "\nreturn " in code else code, "<snippet>", "exec")
 
 END_PATH = r'''
 import json
@@ -854,4 +855,135 @@ try:
     vars['end_path_role'] = __ROLE__
 except Exception:
     pass
+'''
+
+# --- check_payment: a code tool the phone agent calls whenever the customer names a day or an amount ----------
+# The platform wraps the code in a function: arguments arrive in `params`, and what the code returns is the tool
+# result the model reads. Dates are read from the customer's own words, relative to the call's `now`.
+CHECK_PAYMENT = LIB + r'''
+ORD = dict(first=1, second=2, third=3, fourth=4, fifth=5, sixth=6, seventh=7, eighth=8, ninth=9, tenth=10, eleventh=11,
+           twelfth=12, thirteenth=13, fourteenth=14, fifteenth=15, sixteenth=16, seventeenth=17, eighteenth=18, nineteenth=19,
+           twentieth=20, thirtieth=30)
+UNITS = dict(one=1, two=2, three=3, four=4, five=5, six=6, seven=7, eight=8, nine=9)
+WD = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+
+def words_to_digits(t):
+    for tens, base in (('twenty', 20), ('thirty', 30)):
+        for w, n in list(ORD.items()) + [(k + 'th', v) for k, v in UNITS.items()]:
+            if n < 10:
+                t = re.sub(r'\b' + tens + r'[\s-]+' + w + r'\b', str(base + n), t)
+    for w, n in sorted(ORD.items(), key=lambda x: -len(x[0])):
+        t = re.sub(r'\b' + w + r'\b', str(n), t)
+    return t
+
+def spoken_day(text, today, next_rule):
+    """(date or None, note). Reads 'Monday the 26th', 'next Friday', 'tomorrow', '30 October', '2026-10-27'."""
+    t = ' ' + str(text or '').lower().replace(',', ' ').replace('.', ' ') + ' '
+    parts = re.split(r'\b(?:i mean|sorry|actually|rather|correction|no wait|make that|or rather)\b', t)
+    if len(parts) > 1 and parts[-1].strip():
+        t = ' ' + parts[-1] + ' '        # the customer corrected themselves: the last version counts
+    if re.search(r'\d{4}-\d{2}-\d{2}', t):
+        return parse_date(re.search(r'\d{4}-\d{2}-\d{2}', t).group(0), 'DMY'), ''
+    t = words_to_digits(t)
+    if 'day after tomorrow' in t:
+        return today + datetime.timedelta(days=2), ''
+    if 'tomorrow' in t:
+        return today + datetime.timedelta(days=1), ''
+    if re.search(r'\b(today|now|right away)\b', t):
+        return today, ''
+    mo = None
+    for i, name in enumerate(MONTHS):
+        if re.search(r'\b(' + name + '|' + name[:3] + r')\b', t):
+            mo = i + 1
+    num = re.search(r'\b(\d{1,2})(st|nd|rd|th)?\b', t)
+    wd = None
+    for i, name in enumerate(WD):
+        if re.search(r'\b' + name + r'\b', t):
+            wd = i
+    if num:
+        day = int(num.group(1))
+        cands = []
+        for k in range(0, 13):
+            y, m = today.year + (today.month - 1 + k) // 12, (today.month - 1 + k) % 12 + 1
+            if mo and m != mo:
+                continue
+            try:
+                d = datetime.date(y, m, day)
+            except Exception:
+                continue
+            if d >= today:
+                cands.append(d)
+        if cands:
+            note = ''
+            if wd is not None and cands[0].weekday() != wd:
+                note = 'The customer said ' + WD[wd].capitalize() + ' but the ' + str(day) + ' is a ' + WEEKDAYS[cands[0].weekday()] + '; check which day they mean.'
+            return cands[0], note
+    if wd is not None:
+        monday = today - datetime.timedelta(days=today.weekday())
+        if re.search(r'\bnext\b', t) and next_rule != 'next_occurrence':
+            return monday + datetime.timedelta(days=7 + wd), ''
+        if re.search(r'\bthis\b', t):
+            d = monday + datetime.timedelta(days=wd)
+            if d >= today:
+                return d, ''
+        d = today + datetime.timedelta(days=1)
+        while d.weekday() != wd:
+            d = d + datetime.timedelta(days=1)
+        return d, ''
+    return None, 'vague'
+
+def check(params):
+    n = now_dt()
+    today = n.date()
+    plist = products()
+    if not plist:
+        return dict(what_to_do_next='No account facts are loaded. Continue with the conversation.')
+    want = str(params.get('product') or '').strip().lower()
+    chosen = []
+    for p in plist:
+        if want and (want == p['product_id'].lower() or want == str(p['index']) or want in p['spoken'].lower() or p['type'].replace('_', ' ') in want):
+            chosen.append(p)
+    if not chosen:
+        chosen = plist
+    out = []
+    day_text = str(params.get('day') or '').strip()
+    d, note = (None, '')
+    if day_text:
+        d, note = spoken_day(day_text, today, (DATA.get('calendar') or dict()).get('next_weekday_rule') or 'following_week')
+    amt = num(params.get('amount')) if str(params.get('amount') or '').strip() else None
+    for p in chosen:
+        dl = datetime.date.fromisoformat(p['deadline'])
+        who = (p['spoken'] + ': ') if len(chosen) > 1 else ''
+        if day_text:
+            if d is None:
+                out.append(who + 'no exact day was named. Ask once for the exact day; if they still give none, propose the deadline ' + say_date(dl) + '.')
+            elif d < today:
+                out.append(who + say_date(d) + ' is in the past. Ask for a day from today on.')
+            elif d > dl:
+                out.append(who + say_date(d) + ' is after the deadline. Say the latest date you can record is ' + say_date(dl) + ' and offer ' + say_date(dl) + '.')
+            elif not is_bd(d):
+                nb = bd_on_or_after(d)
+                if nb > dl:
+                    nb = dl
+                why = 'a holiday' if d.isoformat() in HOL else 'not a business day'
+                out.append(who + say_date(d) + ' is ' + why + '. Offer the next business day, ' + say_date(nb) + ' (' + nb.isoformat() + ').')
+            else:
+                out.append(who + say_date(d) + ' (' + d.isoformat() + ') is fine and can be recorded.')
+        if amt is not None:
+            if amt > float(p['full']) + 0.005:
+                out.append(who + 'the amount ' + money(amt) + ' is more than the past-due amount ' + money(p['full']) + '; the most you can record is ' + money(p['full']) + '.')
+            elif amt < float(p['floor']) - 0.005:
+                out.append(who + 'the amount ' + money(amt) + ' is below the lowest amount that can be recorded. Say it cannot be recorded and offer the ' + p['floor_name'] + ' of ' + money(p['floor']) + ' once.')
+            else:
+                out.append(who + 'the amount ' + money(amt) + ' is acceptable and can be recorded.')
+    if note and note != 'vague':
+        out.append(note)
+    return dict(day=(d.isoformat() if d else ''), what_to_do_next=' '.join(out) or 'Nothing to check.')
+
+try:
+    _r = check(params if isinstance(params, dict) else dict())
+except Exception as e:
+    _r = dict(what_to_do_next='The check failed (' + str(e)[:80] + '). Use the DATE LOOKUP in the facts.')
+S('last_check', _r.get('what_to_do_next', ''))
+return _r
 '''
