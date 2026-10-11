@@ -15,16 +15,16 @@ def api(method, path, body=None, **params):
     for attempt in range(6):          # transient platform errors (5xx, 429, network) are retried with back-off
         req = urllib.request.Request(URL + path + q, data=json.dumps(body).encode() if body is not None else None, headers=HEADERS, method=method)
         try:
-            with urllib.request.urlopen(req, timeout=120) as r: out = json.load(r)
+            with urllib.request.urlopen(req, timeout=float(os.environ.get("FREYA_HTTP_TIMEOUT", "30"))) as r: out = json.load(r)
             break
         except urllib.error.HTTPError as e:
             msg = e.read().decode()[:1500]
             if (e.code >= 500 or e.code == 429) and attempt < 5:
-                time.sleep(5 * (attempt + 1)); continue
+                time.sleep(2 * (attempt + 1)); continue
             raise RuntimeError(f"{method} {path} -> {e.code}: {msg}") from None
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             if attempt < 5:
-                time.sleep(5 * (attempt + 1)); continue
+                time.sleep(2 * (attempt + 1)); continue
             raise
     return out.get("data", {}).get("result", out) if isinstance(out, dict) else out
 
