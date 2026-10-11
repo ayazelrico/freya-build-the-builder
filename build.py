@@ -1,6 +1,7 @@
 """The builder. Brief files in, a phone agent on Freya out.
 
-    python3 build.py briefs/brief-a.md [briefs/brief-b.md ...] [--openapi tools/openapi.json] [--slot NAME] [--spec SPEC.json]
+    python3 build.py <brief.md> [<more briefs>] [<tool_api.json>] [--slot NAME] [--spec SPEC.json]
+    python3 build.py briefs/hidden-1.md briefs/hidden-1.openapi.json        # the submission form's run_command
 
 Steps: brief -> SPEC (Claude) -> workflow (deterministic code) -> dry-run validation -> save + publish on Freya
 -> export. Every step is written to traces/<slot>-<time>.jsonl.
@@ -63,6 +64,11 @@ def main():
     ap.add_argument("--spec", help="use this SPEC file instead of extracting one (for testing the generator)")
     ap.add_argument("--no-save", action="store_true", help="build and validate only")
     a = ap.parse_args()
+    # A .json among the positional arguments is the tool API file (the form's "{brief_path} {tool_api_path}").
+    apis = [b for b in a.briefs if b.lower().endswith(".json")]
+    if apis:
+        a.openapi = apis[-1]
+        a.briefs = [b for b in a.briefs if not b.lower().endswith(".json")]
 
     slot = a.slot or pathlib.Path(a.briefs[-1]).stem
     out = ROOT / "out"; out.mkdir(exist_ok=True)
@@ -81,7 +87,8 @@ def main():
 
     wf = generate.build(spec, json.loads(openapi_text))
     (out / f"{slot}.workflow.json").write_text(json.dumps(wf, indent=1))
-    trace.event("workflow_generated", nodes=len(wf["nodes"]), bytes=len(json.dumps(wf)))
+    n_tools = sum(len(n.get("tools") or []) + len(n.get("pre_actions") or []) for n in wf["nodes"].values()) + len(wf.get("tools") or [])
+    trace.event("workflow_generated", steps=len(wf["nodes"]), tools=n_tools, bytes=len(json.dumps(wf)))
 
     if not a.no_save:
         freya.validate_workflow(slot, wf)
@@ -91,7 +98,10 @@ def main():
         tune_agent_config(ids["workflow_id"], spec, trace)
         smoke_test(ids["workflow_id"], wf, trace)
         path = freya.export_workflow(ids["workflow_id"], str(out / f"{slot}.export.workflow.json"))
-        trace.event("exported", path=path)
+        sub = ROOT / "submission"; sub.mkdir(exist_ok=True)
+        (sub / f"{slot}.workflow.json").write_text(pathlib.Path(path).read_text())
+        trace.event("exported", path=path, submission=f"submission/{slot}.workflow.json", workflow_id=ids["workflow_id"], agent_id=ids["agent_id"],
+                    steps=len(wf["nodes"]), tools=n_tools)
         print(json.dumps(ids))
     trace.close(slot=slot)
 

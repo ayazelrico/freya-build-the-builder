@@ -8,12 +8,15 @@ class Trace:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.t0 = time.time()
         self.f = self.path.open("w")
+        self.log = self.path.with_suffix(".log").open("w")
         self.event("start", at=time.strftime("%Y-%m-%dT%H:%M:%S%z"))
 
     def event(self, kind, **data):
         line = {"t": round(time.time() - self.t0, 1), "event": kind, **data}
         self.f.write(json.dumps(line, default=str) + "\n"); self.f.flush()
-        print(f"[{line['t']:>6}s] {kind}: " + ", ".join(f"{k}={str(v)[:120]}" for k, v in data.items()), flush=True)
+        text = f"[{line['t']:>6}s] {kind}: " + ", ".join(f"{k}={str(v)[:300]}" for k, v in data.items())
+        self.log.write(text + "\n"); self.log.flush()
+        print(text[:400], flush=True)
 
     def model_call(self, model, purpose, usage=None):
         u = {}
@@ -23,4 +26,4 @@ class Trace:
 
     def close(self, **data):
         self.event("end", at=time.strftime("%Y-%m-%dT%H:%M:%S%z"), seconds=round(time.time() - self.t0), **data)
-        self.f.close()
+        self.f.close(); self.log.close()

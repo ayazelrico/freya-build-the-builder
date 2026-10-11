@@ -1,13 +1,24 @@
 # Freya "Build the Builder": a builder that turns a bank brief into a phone agent
 
+## Run it
+
 ```bash
-source env.sh                                   # FREYA_API_KEY, FREYA_BANK_TEAM_KEY, ANTHROPIC_API_KEY
-python3 build.py briefs/brief-a.md briefs/brief-b.md --slot my-agent
-python3 build.py <final-brief.md> --openapi <its-openapi.json> --slot final-1
+python3 -m pip install -r requirements.txt          # Python 3.10+; the builder only needs the anthropic SDK
+export FREYA_API_KEY=fak_...                         # Freya workspace key
+export FREYA_API_URL=https://staging-app.freyavoice.ai
+export FREYA_BANK_TEAM_KEY=...                       # any 16+ character secret (practice runs only)
+export ANTHROPIC_API_KEY=sk-ant-...                  # the builder's own model calls (Claude Opus 5.5)
+
+python3 build.py {brief_path} {tool_api_path}        # e.g. python3 build.py briefs/hidden-1.md briefs/hidden-1.openapi.json
 ```
 
-One command, no manual step: brief(s) + tool API in → a published Freya workflow, its export
-(`out/<slot>.export.workflow.json`) and a trace (`traces/<slot>-<time>.jsonl`) out.
+One command, no manual step. Outputs:
+- `submission/<brief name>.workflow.json`: the exported phone agent (`freya.export_workflow`)
+- `traces/<brief name>-<time>.log` (plain text) and `.jsonl`: start/end time, every model call (model and purpose),
+  the workflow id, agent id, number of steps and tools, and the self-test result
+- `out/<brief name>.spec.json`: what the builder read from the brief
+
+The slot defaults to the brief's file name, so a second run on the same brief updates the same Freya workflow.
 
 ## How it works
 

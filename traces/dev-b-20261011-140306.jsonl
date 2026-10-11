@@ -9,3 +9,6 @@
 {"t": 201.2, "event": "dry_run_ok"}
 {"t": 405.2, "event": "saved_on_freya", "workflow_id": "161e15b7-f3a4-4692-ba1e-42b8f298af56", "agent_id": "39ebb914-4456-4b56-b85e-2b032298e281", "version": 29}
 {"t": 609.1, "event": "agent_config_tuned", "wait_seconds": 4.0, "language": "en", "version": 29}
+{"t": 898.5, "event": "self_test_chat_turn", "ok": false, "error": "POST /api/v2/chat/message -> 500: {\"success\":false,\"data\":{\"message\":\"Internal server error\",\"result\":{\"requestId\":\"503923ac-eaf1-43f6-986c-f14135a860b6\"}}}"}
+{"t": 964.3, "event": "exported", "path": "/Users/ayazelrico/Desktop/FREYA AI VOICE HACKHATON/build-the-builder/out/dev-b.export.workflow.json"}
+{"t": 964.3, "event": "end", "at": "2026-10-11T14:19:10+0300", "seconds": 964, "slot": "dev-b"}
