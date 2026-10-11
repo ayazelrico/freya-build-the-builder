@@ -12,19 +12,19 @@ HEADERS = {"Authorization": "Bearer " + os.environ.get("FREYA_API_KEY", ""), "Co
 def api(method, path, body=None, **params):
     """Call the API and return the `result` part of its {success, data: {message, result}} envelope."""
     q = "?" + urllib.parse.urlencode(params) if params else ""
-    for attempt in range(6):          # transient platform errors (5xx, 429, network) are retried with back-off
+    for attempt in range(12):         # transient platform errors (5xx, 429, network) are retried with back-off (about 3 minutes in all)
         req = urllib.request.Request(URL + path + q, data=json.dumps(body).encode() if body is not None else None, headers=HEADERS, method=method)
         try:
             with urllib.request.urlopen(req, timeout=float(os.environ.get("FREYA_HTTP_TIMEOUT", "30"))) as r: out = json.load(r)
             break
         except urllib.error.HTTPError as e:
             msg = e.read().decode()[:1500]
-            if (e.code >= 500 or e.code == 429) and attempt < 5:
-                time.sleep(2 * (attempt + 1)); continue
+            if (e.code >= 500 or e.code == 429) and attempt < 11:
+                time.sleep(min(3 * (attempt + 1), 20)); continue
             raise RuntimeError(f"{method} {path} -> {e.code}: {msg}") from None
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
-            if attempt < 5:
-                time.sleep(2 * (attempt + 1)); continue
+            if attempt < 11:
+                time.sleep(min(3 * (attempt + 1), 20)); continue
             raise
     return out.get("data", {}).get("result", out) if isinstance(out, dict) else out
 
