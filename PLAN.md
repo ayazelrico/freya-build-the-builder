@@ -110,3 +110,9 @@ Kapasite: aynı anda 1 simülasyon, 10 case = 3–11 dk. Önce sadece fail eden 
 - A+B ajanı varsayılan stil: 10/13 (kalan 3 fail = tek ürünlü A müşterilerinde Brief B'nin not kuralı).
 - Stiller: pieces 10/13, corrects 10/13, asks_back 10/13, in_words 9/13, talkative 7→9/13 (turn wait ayarı).
 - Sahte gizli brief'ler (C: dağınık ham materyal, D: farklı yapı) çökmeden, doğru spec'le derleniyor.
+
+## 10. Durum (Paz ~11:00) — kullanım limiti nedeniyle ara
+- Son yayındaki sürüm: dev-b v28 (deterministik kimlik yolu + check_payment aracı + 4 sn tur bekleme).
+- v28 pieces 11/13 (gerçek fail 0). v28 x3 doğrulaması arka planda koşuyordu: `results/v28-summary.txt`.
+- Final için builder hazır: `python3 build.py <brief> --openapi <openapi> --slot final-N` (prova 113 sn).
+- Kalan: v28 x3 sonucunu kontrol et → temizse özellik dondur → 20:00 runbook (bölüm 8).
