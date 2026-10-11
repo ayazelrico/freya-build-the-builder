@@ -362,7 +362,7 @@ try:
         if any(a['amount_rule'] == 'full_or_floor_if_full_refused' for a in p['plan']):
             seqs.append(('if the customer said the full amount is too much', True))
         for label, too_much in seqs:
-            F.append('- OFFER SEQUENCE ' + label + ' (each offer at most once, in this order; say it exactly as written):')
+            F.append('- OFFER SEQUENCE ' + label + ' (each offer at most once, in this order; say it exactly as written. ' + ('The question about paying today was already asked in your first message for all products: never ask about today again; when you turn to this product, your first proposal is offer 1' if len(plist) > 1 else 'The question about paying today is asked only once') + '):')
             for a in p['plan']:
                 F.append('    offer ' + str(a['number']) + ': "' + offer(a['amount_rule'] or 'full', datetime.date.fromisoformat(a['date']), too_much) + '"')
         p['offers'] = []
