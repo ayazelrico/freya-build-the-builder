@@ -5,7 +5,7 @@ inputs, a mock URL instead). The builder still owns everything around the model:
 platform rules it hands over, validation (local checks + Freya dry run) with a repair loop, saving, the agent
 settings, the self-test and the export.
 """
-import json, os, pathlib, re
+import json, os, pathlib, re, subprocess, types
 
 import anthropic
 
@@ -36,13 +36,46 @@ def _client():
     return anthropic.Anthropic(max_retries=4)
 
 
-def _ask(trace, purpose, system, content, effort="high", max_tokens=100000):
+def _ask(trace, purpose, system, content, effort="high", max_tokens=128000):
+    try:
+        return _ask_once(trace, purpose, system, content, effort, max_tokens)
+    except ValueError as e:
+        # The answer ran out of room (long thinking) or had no JSON: ask again with less thinking.
+        trace.event("model_retry", purpose=purpose, reason=str(e)[:200])
+        return _ask_once(trace, purpose + " (retry)", system, content, "low", max_tokens)
+
+
+def _ask_cli(system, content, effort):
+    """BUILDER_BACKEND=cli: run the prompt through a logged-in Claude Code CLI (`claude -p`) instead of the API key."""
+    exe = os.environ.get("CLAUDE_CLI", "claude")
+    prompt = "\n\n".join(c["text"] for c in content)
+    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+    r = subprocess.run([exe, "-p", "--model", MODEL, "--output-format", "json", "--max-turns", "1",
+                        "--effort", effort, "--system-prompt", system, "--tools", ""],
+                       input=prompt, capture_output=True, text=True, env=env, timeout=3600)
+    out = json.loads(r.stdout or "{}")
+    if out.get("is_error") or not out.get("result"):
+        raise RuntimeError(f"claude cli failed: {(out.get('result') or r.stderr or r.stdout)[:500]}")
+    u = out.get("usage") or {}
+    usage = types.SimpleNamespace(input_tokens=u.get("input_tokens", 0), output_tokens=u.get("output_tokens", 0))
+    return out["result"], usage
+
+
+def _ask_once(trace, purpose, system, content, effort, max_tokens):
+    if os.environ.get("BUILDER_BACKEND") == "cli":
+        text, usage = _ask_cli(system, content, effort)
+        trace.model_call(MODEL + " (claude cli)", purpose, usage)
+        m = re.search(r"```json\s*(.*?)```", text, re.S)
+        raw = m.group(1) if m else text[text.find("{"): text.rfind("}") + 1]
+        return json.loads(raw), text
     with _client().messages.stream(model=MODEL, max_tokens=max_tokens, system=system,
                                    thinking={"type": "adaptive"}, output_config={"effort": effort},
                                    messages=[{"role": "user", "content": content}]) as stream:
         msg = stream.get_final_message()
     trace.model_call(MODEL, purpose, msg.usage)
     text = "".join(b.text for b in msg.content if b.type == "text")
+    if msg.stop_reason == "max_tokens" and "```json" in text and "```" not in text.split("```json", 1)[1]:
+        raise ValueError("answer cut off at max_tokens")
     m = re.search(r"```json\s*(.*?)```", text, re.S)
     raw = m.group(1) if m else text[text.find("{"): text.rfind("}") + 1]
     return json.loads(raw), text
@@ -91,8 +124,9 @@ def write_workflow(docs, mock_url, trace, validate):
             {"type": "text", "text": f"<case>\n{case}\n</case>", "cache_control": {"type": "ephemeral"}}]
     ask = (f"The bank's services are served at this base URL (use it for every tool URL; paths and field names exactly as in the integration document): {mock_url}\n"
            "First think through the call flow, every rule, every service, and every exact sentence the documents require. "
+           "Keep your planning compact: the workflow JSON is the deliverable and must fit in the answer. "
            "Then output the complete workflow JSON in one ```json block.")
-    wf, _ = _ask(trace, "write the workflow from the case documents", system, base + [{"type": "text", "text": ask}], effort="high")
+    wf, _ = _ask(trace, "write the workflow from the case documents", system, base + [{"type": "text", "text": ask}], effort="medium")
     for attempt in range(4):
         problems = local_problems(wf)
         err = "" if problems else validate(wf)
