@@ -90,20 +90,29 @@ Kapasite: aynı anda 1 simülasyon, 10 case = 3–11 dk. Önce sadece fail eden 
 | Workflow limiti | Hep aynı slot (update+publish) |
 | 30 dk build limiti | Self-test bütçeli, zaman aşımında en iyi sürüm kalır |
 
-## 8. Final runbook (Pazar 20:00 TRT)
+## 8. Final runbook (Pazar 20:00 TRT = 17:00 UTC) — kesinleşmiş hâli
 
-1. Final brief'leri ve openapi dosyalarını `finals/` klasörüne koy (her brief'in kendi openapi'si).
-2. Her brief için **bir kez**, elle hiçbir adım olmadan:
+Gizli brief'ler mail ile gelir (her biri kendi tool API dosyasıyla). Teslim adımları da aynı mailde gelir.
+Son teslim: **23:00 TRT (20:00 UTC)**. Hedef: 22:30'dan önce.
+
+1. Dosyaları `finals/hidden-1/` ve `finals/hidden-2/` klasörlerine koy (brief bir ya da birden çok dosya olabilir; tool API json da aynı klasöre).
+   Builder klasörü okur, tool API'yi içeriğinden tanır, slot adı klasör adı olur.
+2. Her biri için **bir kez**, elle müdahale yok:
    ```bash
    source env.sh
-   python3 build.py finals/<brief-1>.md --openapi finals/<openapi-1>.json --slot final-1
-   python3 build.py finals/<brief-2>.md --openapi finals/<openapi-2>.json --slot final-2
+   python3 build.py finals/hidden-1
+   python3 build.py finals/hidden-2
    ```
-   Çıktılar: `out/final-N.export.workflow.json` (submit edilecek), `traces/final-N-<zaman>.jsonl` (submit edilecek).
-3. Çökme olursa: sadece parser/crash düzelt. Final brief'ten **hiçbir değer, kural, isim** koda/prompta girmez. Sonra builder'ı baştan çalıştır.
-4. `git add -f out/final-* finals/ && git add traces/final-* && git commit -m "Final builds" && git push` → `git rev-parse HEAD` ile commit hash'ini al.
-   (Prova: sahte brief C'de uçtan uca 113 sn, export tur alma ayarlarını içeriyor.)
-5. Submit: takım (solo), repo linki, commit hash, iki export dosyası, iki trace.
+   (Eşdeğeri: `python3 build.py <brief dosyaları> <tool_api.json> --slot hidden-1`.)
+   Üretilenler: `submission/hidden-N.workflow.json`, `traces/hidden-N-<zaman>.log` (+ `.jsonl`), `out/hidden-N.spec.json`.
+3. Trace'te `self_test_chat_turn: ok=True` ve `exported` satırlarını kontrol et.
+4. Çökme olursa: sadece parser/crash düzelt (brief'ten değer/kural/isim YOK), commit, builder'ı baştan çalıştır. Son koşunun ajanı + trace'i teslim edilir.
+5. Commit + push:
+   ```bash
+   git add -f finals/ submission/ traces/hidden-* && git commit -m "Final builds" && git push
+   ```
+6. `python3 make_submission.py hidden-1 hidden-2` → `submission.json` (eksik varsa "NOT READY" der).
+7. `submission.json` içeriğini maildeki adrese gönder (maildeki talimata göre).
 
 ## 9. Durum (Cmt 21:45)
 
