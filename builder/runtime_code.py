@@ -1051,28 +1051,40 @@ try:
     ans = str(V('id_answer', '') or '').strip()
     S('id_answer', '')
     fmt = q.get('answer_format') or 'text'
-    norm, missing = '', ''
-    if fmt == 'date':
-        d = parse_date(ans, I.get('numeric_date_order') or 'DMY')
-        if d is None or not re.search(r'\d{4}|\d{1,2}[./-]\d{1,2}[./-]\d{2}', ans) or d.year > now_dt().year - 10:
-            missing = 'the full date including the year'
+    order = I.get('numeric_date_order') or 'DMY'
+    need = int(q.get('digits') or (4 if fmt == 'year' else 0))
+
+    def judge(a):
+        if fmt == 'date':
+            d = parse_date(a, order)
+            if d is None or not re.search(r'\d{4}|\d{1,2}[./-]\d{1,2}[./-]\d{2}', a) or d.year > now_dt().year - 10:
+                return '', 'the full date including the year'
+            return d.isoformat(), ''
+        if fmt in ('digits', 'year'):
+            ds = re.sub(r'\D', '', a)
+            if need and len(ds) < need:
+                return '', 'all ' + str(need) + ' digits'
+            return (ds[-need:] if need else ds), ''
+        return (a, '') if a else ('', 'the answer')
+
+    # An answer given in pieces: keep the incomplete part and join the next piece to it.
+    partial = str(V('id_partial_' + f, '') or '')
+    norm, missing = judge(ans)
+    if missing and partial and ans and ans not in partial:
+        joined = (partial + ' ' + ans) if fmt != 'digits' else (re.sub(r'\D', '', partial) + re.sub(r'\D', '', ans))
+        n2, m2 = judge(joined)
+        if not m2:
+            norm, missing = n2, ''
         else:
-            norm = d.isoformat()
-    elif fmt in ('digits', 'year'):
-        ds = re.sub(r'\D', '', ans)
-        need = int(q.get('digits') or (4 if fmt == 'year' else 0))
-        if need and len(ds) < need:
-            missing = 'all ' + str(need) + ' digits'
-        else:
-            norm = ds[-need:] if need else ds
+            ans = joined
+    if missing:
+        S('id_partial_' + f, (ans if len(ans) < 60 else ans[-60:]))
     else:
-        norm = ans
-        if not norm:
-            missing = 'the answer'
+        S('id_partial_' + f, '')
     last = str(V('id_last_' + f, '') or '')
     if missing:
         S('id_route', 'ask')
-        S('id_say_text', 'Thank you. Could you please give me ' + missing + '?')
+        S('id_say_text', 'And the rest, please?' if partial or ans else 'Could you please give me ' + missing + '?')
     elif norm == last:
         S('id_route', 'ask')
         S('id_say_text', str(q.get('ask') or 'Could you please repeat your answer?'))

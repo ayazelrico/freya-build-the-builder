@@ -167,6 +167,12 @@ def test_identity_path():
     print(answer("44", {}))                                                             # pieces: two digits only
     print(answer("4401", {"ok": True, "verified": False, "wrong_answers_left": 2, "all_verified": False}))
     r = answer("4410", {"ok": True, "verified": True, "wrong_answers_left": 2, "all_verified": True}); print(r); assert r[3] == "verified"
+    v3 = {"customer_id": "c", "now": "2026-10-14T11:00"}; run(node_code(wf, "setup"), v3); v.clear(); v.update(v3)
+    print(answer("21 August", {}))
+    r = answer("1992", {"ok": True, "verified": False, "wrong_answers_left": 2}); print(r); assert r[1] == "1992-08-21"
+    print(answer("1983-10-19", {"ok": True, "verified": True, "wrong_answers_left": 3, "all_verified": False}))
+    print(answer("44", {}))
+    r = answer("10", {"ok": True, "verified": True, "wrong_answers_left": 3, "all_verified": True}); print(r); assert r[1] == "4410"
     print("IDENTITY PATH OK")
 
 
