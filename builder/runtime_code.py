@@ -313,6 +313,14 @@ try:
         full = num(p.get(acc.get('past_due_field') or 'past_due'))
         days = int(num(p.get(acc.get('days_late_field') or 'days_late')) or 0)
         floor = num(p.get(tinfo.get('floor_field') or '')) if tinfo.get('floor_field') else None
+        fl = DATA.get('floor') or dict()
+        pct = tinfo.get('floor_percent') if tinfo.get('floor_percent') is not None else fl.get('percent_of_past_due')
+        if floor is None and pct is not None and full is not None:
+            floor = round(full * float(pct) / 100.0, 2)          # a floor defined as a share of the past-due amount
+        if floor is None and (tinfo.get('floor_amount') is not None or fl.get('fixed_amount') is not None):
+            floor = num(tinfo.get('floor_amount') if tinfo.get('floor_amount') is not None else fl.get('fixed_amount'))
+        if floor is not None and fl.get('min_amount') is not None and full is not None:
+            floor = max(floor, min(num(fl.get('min_amount')) or 0, full))
         if floor is None or (full is not None and floor > full):
             floor = full
         b = band_for(days)

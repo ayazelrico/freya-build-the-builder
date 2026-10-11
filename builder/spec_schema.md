@@ -77,6 +77,10 @@ General rules
   "product_types": {                   // one entry per product type value in the tool API
     "<type value>": {"spoken": "credit card ending {card_last4}", "floor_field": "<field holding the lowest acceptable amount>", "floor_name": "minimum payment"}
   },                                   // {field} in "spoken" inserts a field of the product record
+  // The floor (lowest amount that may be recorded) per product type is one of: "floor_field" (a field of the product
+  // record), "floor_percent" (a percentage of the past-due amount, e.g. 50) or "floor_amount" (a fixed amount).
+  "floor": {"percent_of_past_due": null, "fixed_amount": null, "min_amount": null},   // optional rules for every type;
+                                       // min_amount: the floor is never below this (but never above the past-due amount)
 
   "calendar": {"business_weekdays": [1,2,3,4,5], "holidays": ["YYYY-MM-DD"],      // ISO weekday numbers, Monday = 1
                "next_weekday_rule": "following_week",

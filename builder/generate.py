@@ -153,7 +153,7 @@ def build(spec, openapi):
     P = spec.get("promise_tool") or {}
     C = spec.get("close") or {}
     notes = spec.get("notes") or {}
-    data = {k: spec.get(k) for k in ("calendar", "callback", "identity", "account", "product_types", "bands", "attempts",
+    data = {k: spec.get(k) for k in ("calendar", "callback", "identity", "account", "product_types", "bands", "attempts", "floor",
                                       "promise_tool", "transfer", "notes", "lines", "currency_word", "close", "outcomes")}
     have = set(tools)
     if "schedule_callback" in tools:     # which callback fields hold the date and the time, from the tool API
