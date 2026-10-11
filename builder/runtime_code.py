@@ -327,7 +327,8 @@ try:
         dl = deadline_for(b, today)
         att = int(b.get('attempts') or 1)
         plan = []
-        for a in (DATA.get('attempts') or [])[:att]:
+        bplan = b.get('attempts_plan') or b.get('attempts_override')   # a band may have its own offer plan
+        for a in (bplan if isinstance(bplan, list) and bplan else (DATA.get('attempts') or [])[:att]):
             plan.append(dict(number=a.get('number'), amount_rule=a.get('amount'), date=attempt_date(a.get('date'), today, dl).isoformat()))
         plist.append(dict(index=i + 1, product_id=str(p.get(acc.get('id_field') or 'product_id') or ('p' + str(i + 1))), type=ptype,
                           spoken=spoken, full=full, floor=floor, floor_name=tinfo.get('floor_name') or 'minimum amount',
@@ -432,8 +433,8 @@ try:
 
     def row(rl, reason=None):
         rs = [r for r in O if (r.get('role') or 'other') == rl]
-        if reason is not None:
-            rs = [r for r in rs if (r.get('reason') or '') == reason] or rs
+        if reason is not None:     # the mapped value can be the row's reason or, in some briefs, its outcome code
+            rs = [r for r in rs if (r.get('reason') or '') == reason] or [r for r in rs if str(r.get('outcome')) == reason] or rs
         return rs[0] if rs else None
 
     outcome, reason = str(V('end_path_outcome', '') or ''), str(V('end_path_reason', '') or '')

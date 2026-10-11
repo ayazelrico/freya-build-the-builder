@@ -1,0 +1,348 @@
+{
+ "bank_name": "Ostsee Sparbank",
+ "language": "English",
+ "currency_word": "",
+ "call_variables": [
+  "customer_id",
+  "first_name",
+  "last_name",
+  "title",
+  "now"
+ ],
+ "lines": {
+  "opening": "Good day, this is the automated service of Ostsee Sparbank.",
+  "confirm_identity": "May I speak to {first_name} {last_name}, please?",
+  "ai_answer": "Yes, I am the automated service of Ostsee Sparbank.",
+  "scam_answer": "This is a genuine call from the automated service of Ostsee Sparbank. Before I can say more, I need to check that I am speaking with the right person.",
+  "identity_intro": "Before we continue, I need to ask you three security questions.",
+  "identity_failed": "I am sorry, I could not verify your identity. Please visit one of our branches with your ID.",
+  "identity_decline_explanation": "I can only discuss your account once I have checked that I am speaking with the right person. This protects your personal data.",
+  "debt_intro": "Thank you. I am calling from Ostsee Sparbank about an overdue payment.",
+  "debt_intro_multi": "Thank you. I am calling from Ostsee Sparbank about some overdue payments.",
+  "first_ask": "Can you pay the full overdue amount?",
+  "first_ask_multi": "Can you pay the full overdue amount for each of these products?",
+  "full_offer": "Can you pay the full {amount} on {date}?",
+  "floor_offer": "Can you pay at least the {floor_name} of {amount} on {date}?",
+  "confirm_question": "Do you confirm?",
+  "promise_recorded": "Thank you, your payment arrangement is now in place.",
+  "sms_sentence": "We will send you a letter confirming this arrangement.",
+  "service_error": "I am sorry, due to a technical problem I could not record your arrangement.",
+  "already_paid": "Thank you for letting me know. A payment can take up to two business days to show.",
+  "change_promise": "Of course. Let us agree on a new amount and date.",
+  "condolence": "I am very sorry for your loss.",
+  "no_info": "I am sorry, I do not have that information.",
+  "goodbye": "Thank you for your time. Goodbye."
+ },
+ "forbidden_before_verification": [
+  "reason for the call",
+  "overdue",
+  "arrears",
+  "debt",
+  "payment",
+  "amount",
+  "days overdue",
+  "overdraft",
+  "instalment loan",
+  "account details"
+ ],
+ "contact": {
+  "max_asks": 2,
+  "confirmations": [
+   "yes",
+   "speaking",
+   "that's me",
+   "this is he",
+   "this is she"
+  ],
+  "not_confirmations": [
+   "no",
+   "wrong number",
+   "they are not here",
+   "who?",
+   "I don't know that person"
+  ]
+ },
+ "callback": {
+  "enabled": false,
+  "days": "today_or_next_business_day",
+  "window_start": "00:00",
+  "window_end": "23:59",
+  "must_be_after_now": true,
+  "min_minutes_after_now": 0,
+  "max_asks": 0
+ },
+ "identity": {
+  "field_param": "field",
+  "answer_param": "answer",
+  "questions": [
+   {
+    "field": "date_of_birth",
+    "ask": "What is your date of birth?",
+    "answer_format": "date",
+    "spoken_name": "date of birth"
+   },
+   {
+    "field": "postcode",
+    "ask": "What is your postcode?",
+    "answer_format": "text",
+    "spoken_name": "postcode"
+   },
+   {
+    "field": "phone_last4",
+    "ask": "What are the last four digits of your phone number?",
+    "answer_format": "digits",
+    "digits": 4,
+    "spoken_name": "last four digits of your phone number"
+   }
+  ],
+  "max_wrong_total": 2,
+  "numeric_date_order": "DMY",
+  "response": {
+   "answer_ok": "verified",
+   "all_ok": "all_verified",
+   "remaining": "wrong_answers_left",
+   "hint": "",
+   "ok": "ok"
+  },
+  "hints": [],
+  "decline_max": 2
+ },
+ "account": {
+  "products_field": "products",
+  "id_field": "product_id",
+  "type_field": "type",
+  "past_due_field": "overdue",
+  "days_late_field": "days_overdue"
+ },
+ "product_types": {
+  "overdraft": {
+   "spoken": "overdraft on the account ending {account_last4}",
+   "floor_percent": 30,
+   "floor_name": "lowest acceptable payment"
+  },
+  "instalment_loan": {
+   "spoken": "instalment loan",
+   "floor_percent": 30,
+   "floor_name": "lowest acceptable payment"
+  }
+ },
+ "floor": {
+  "percent_of_past_due": 30,
+  "fixed_amount": null,
+  "min_amount": 25.0
+ },
+ "calendar": {
+  "business_weekdays": [
+   1,
+   2,
+   3,
+   4,
+   5
+  ],
+  "holidays": [
+   "2026-12-24",
+   "2026-12-25",
+   "2026-12-31",
+   "2027-01-01"
+  ],
+  "next_weekday_rule": "next_occurrence",
+  "non_business_day": "previous_business_day",
+  "after_deadline": "refuse"
+ },
+ "bands": [
+  {
+   "name": "up to 30 days overdue",
+   "min_days_late": 1,
+   "max_days_late": 30,
+   "deadline": {
+    "type": "calendar_days_after_today",
+    "n": 10
+   },
+   "attempts": 1,
+   "attempts_override": [
+    {
+     "number": 1,
+     "amount": "full",
+     "date": "deadline"
+    }
+   ]
+  },
+  {
+   "name": "31-90 days overdue",
+   "min_days_late": 31,
+   "max_days_late": 90,
+   "deadline": {
+    "type": "end_of_month"
+   },
+   "attempts": 2
+  }
+ ],
+ "attempts": [
+  {
+   "number": 1,
+   "amount": "full",
+   "date": "next_business_day"
+  },
+  {
+   "number": 2,
+   "amount": "floor",
+   "date": "deadline"
+  }
+ ],
+ "promise_tool": {
+  "product_param": "product_id",
+  "amount_param": "amount",
+  "date_param": "date",
+  "ok_field": "ok"
+ },
+ "multi_product": true,
+ "notes": {
+  "enabled": false,
+  "tool": "add_note",
+  "product_param": "product_id",
+  "reason_param": "reason",
+  "reasons": [
+   "refused",
+   "hardship",
+   "dispute",
+   "paid",
+   "service_error"
+  ],
+  "paid_reason": "paid",
+  "none_on_transfer": false
+ },
+ "transfer": {
+  "queue_param": "queue",
+  "queue_to_reason": {
+   "hardship": "52",
+   "service": "51"
+  }
+ },
+ "close": {
+  "outcome_param": "code",
+  "reason_param": "",
+  "no_reason_outcomes": [
+   "10",
+   "21",
+   "22",
+   "23",
+   "24",
+   "25",
+   "31",
+   "32",
+   "33",
+   "34",
+   "41",
+   "42",
+   "51",
+   "52"
+  ]
+ },
+ "outcomes": [
+  {
+   "outcome": "10",
+   "reason": "",
+   "when": "promise recorded for at least one product",
+   "stage": "negotiate",
+   "role": "promise"
+  },
+  {
+   "outcome": "21",
+   "reason": "",
+   "when": "refusal after all persuasion attempts",
+   "stage": "negotiate",
+   "role": "refused"
+  },
+  {
+   "outcome": "22",
+   "reason": "",
+   "when": "customer says already paid",
+   "stage": "negotiate",
+   "role": "paid"
+  },
+  {
+   "outcome": "23",
+   "reason": "",
+   "when": "customer disputes the debt",
+   "stage": "negotiate",
+   "role": "dispute"
+  },
+  {
+   "outcome": "24",
+   "reason": "",
+   "when": "hardship, customer declined the hardship team",
+   "stage": "negotiate",
+   "role": "hardship"
+  },
+  {
+   "outcome": "25",
+   "reason": "",
+   "when": "create_promise failed twice",
+   "stage": "negotiate",
+   "role": "service_error"
+  },
+  {
+   "outcome": "31",
+   "reason": "",
+   "when": "somebody else answered, no call back arranged",
+   "stage": "third_party",
+   "role": "other"
+  },
+  {
+   "outcome": "32",
+   "reason": "",
+   "when": "number unknown to the person answering",
+   "stage": "contact",
+   "role": "wrong_number"
+  },
+  {
+   "outcome": "33",
+   "reason": "",
+   "when": "customer deceased",
+   "stage": "contact",
+   "role": "deceased"
+  },
+  {
+   "outcome": "34",
+   "reason": "",
+   "when": "unclear who answered after two asks",
+   "stage": "contact",
+   "role": "unclear"
+  },
+  {
+   "outcome": "41",
+   "reason": "",
+   "when": "two wrong security answers in total",
+   "stage": "identity",
+   "role": "id_failed"
+  },
+  {
+   "outcome": "42",
+   "reason": "",
+   "when": "customer refuses to answer security questions",
+   "stage": "identity",
+   "role": "id_declined"
+  },
+  {
+   "outcome": "51",
+   "reason": "",
+   "when": "customer asked for a person, transferred to queue service",
+   "stage": "any",
+   "role": "transferred"
+  },
+  {
+   "outcome": "52",
+   "reason": "",
+   "when": "hardship, accepted transfer to queue hardship",
+   "stage": "negotiate",
+   "role": "transferred"
+  }
+ ],
+ "rules_text": {
+  "global": "- Speak English. Be short, polite and honest; never invent terms, amounts, dates or rules.\n- Say nothing about the reason for the call before the security check is fully passed.\n- If asked whether you are a robot, say you are the automated service of Ostsee Sparbank.\n- If asked whether this is a scam, say it is a genuine call from Ostsee Sparbank and that you must first check identity.\n- If the customer asks for a person at any time, call transfer_to_agent with queue service immediately and end as 51.\n- Always thank the customer and say goodbye before ending.\n- End every call with close_call, code = the two-digit outcome code; close_call is always the last tool call.\n- Use the codes exactly: 10, 21, 22, 23, 24, 25, 31, 32, 33, 34, 41, 42, 51, 52.",
+  "contact": "- Open with: \"Good day, this is the automated service of Ostsee Sparbank.\"\n- Then ask to speak to the customer by first and last name.\n- Do not mention the reason for the call.\n- If the person confirms they are the customer, go to the security questions.\n- If somebody else answers, go to the third-party step.\n- If the number is unknown to the person, end as 32.\n- If the customer has died, express condolences and end as 33.\n- If after two asks it is unclear who answered, end as 34.",
+  "third_party": "- Do NOT arrange any call back; never call schedule_callback.\n- Do not reveal the reason for the call.\n- Thank the person, say we will try again another time, say goodbye, and end as 31.",
+  "identity": "- Ask three questions in this order: date of birth, postcode, last four digits of the phone number.\n- Check each answer with verify_identity (field = date_of_birth, postcode, phone_last4; answer = the given answer).\n- Convert a spoken date of birth to YYYY-MM-DD; read numeric dates as day-month-year. An unreadable value (ok=false) is not a wrong answer: ask again.\n- Phone answer must be four digits.\n- Count wrong answers yourself: a total of two wrong answers ends the check (stricter than the tool's three). Then tell the customer to visit a branch with ID, thank, say goodbye and end as 41.\n- If the customer refuses to answer, explain once why the check is needed; if they still refuse, end as 42.\n- Only when all three are passed (all_verified true) continue; never call get_account before that.\n- If verify_identity fails with a service error (500), repeat the call.",
+  "negotiate": "- Call get_account. Tell the customer each overdue product (up to three) with its overdue amount and days overdue.\n- Lowest acceptable payment per product: 30 % of the overdue amount, but never less than 25.00 (and never more than the overdue amount). Never record less than this or more than the overdue amount.\n- Payment date limit: up to 30 days overdue = at most 10 calendar days from today; 31-90 days overdue = the last business day of the current month. If the limit day is not a business day, use the business day before it.\n- Business days: Monday to Friday, except 2026-12-24, 2026-12-25, 2026-12-31 and 2027-01-01.\n- If the customer names a weekend or holiday, propose the business day before it.\n- A date beyond the limit cannot be accepted: say so and ask for another date within the limit.\n- \"Next Monday\" etc. means the next such day to come.\n- Step 1: ask for the full overdue amount first. If the customer agrees to the full amount (or any amount from the lowest acceptable payment up to the full amount) on a valid business day within the limit, go to confirmation.\n- Step 2 (persuasion), up to 30 days overdue: one attempt only - offer the full amount on the limit date. If refused, end as 21.\n- Step 2 (persuasion), 31-90 days overdue: attempt 1 - offer the full amount on the next business day; attempt 2 - offer the lowest acceptable payment on the limit date. If both are refused, end as 21. Never repeat an offer.\n- Confirmation: state amount, date and product, ask \"Do you confirm?\", then call create_promise (product_id, amount, date as YYYY-MM-DD). One promise per product.\n- After success (ok true) say the arrangement is in place and say: \"We will send you a letter confirming this arrangement.\"\n- If create_promise fails, try once more; if it fails twice, apologise and end as 25.\n- Already paid: say a payment can take up to two business days to show; end as 22.\n- Disputed debt: end as 23.\n- Hardship (illness, unemployment, bereavement): offer the hardship team; accepted - call transfer_to_agent with queue hardship and end as 52; declined - end as 24.\n- Several products: handle each product in turn with its own band, limit and lowest payment. If a promise was recorded for at least one product, end as 10.\n- After the outcome, thank the customer, say goodbye and call close_call with the code."
+ }
+}

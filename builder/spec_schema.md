@@ -91,7 +91,8 @@ General rules
   "bands": [                           // how late -> deadline and number of persuasion attempts
     {"name": "...", "min_days_late": 1, "max_days_late": 10,
      "deadline": {"type": "business_days_after_today", "n": 5},
-     "attempts": 1}
+     "attempts": 1,
+     "attempts_plan": [...]}             // optional: this band's own offer plan (same format as "attempts" below)
   ],
   // deadline types: business_days_after_today (the n-th business day after today),
   //   business_days_after_today_counting_today, calendar_days_after_today (rolled back to a business day),

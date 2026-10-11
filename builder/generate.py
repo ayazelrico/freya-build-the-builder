@@ -239,7 +239,7 @@ def build(spec, openapi):
          "description": "CALL as soon as the person confirms they are {{first_name}} {{last_name}} ({{title}} {{last_name}}).",
          "condition": {"operator": "matches_intent", "description": "The person confirmed they are {{title}} {{last_name}}."}},
     ]
-    if third_rows and callback:
+    if third_rows:
         opening_tr.append({"target_node": "third_party", "is_tool_call": True,
                            "description": "CALL when the person says they are NOT {{first_name}} {{last_name}} but someone else who knows them (a relative, partner, colleague, flatmate).",
                            "condition": {"operator": "matches_intent", "description": "Someone other than the customer answered."}})
@@ -258,16 +258,17 @@ def build(spec, openapi):
         max_turns=14, max_target=key_for("unclear"))
 
     # -------- third party
-    if third_rows and callback:
+    cb_on = bool((spec.get("callback") or {}).get("enabled")) and callback is not None
+    if third_rows:
         tp_tr = [{"target_node": key_for("callback"), "description": "callback scheduled",
-                  "condition": cond_eq("callback_state", "scheduled")}] if key_for("callback") else []
+                  "condition": cond_eq("callback_state", "scheduled")}] if (key_for("callback") and cb_on) else []
         tp_tr += [end_transition(spec, r) for r in third_rows + stage_rows("contact") if role(r) not in ("callback", "unclear", "transferred")]
         nodes["third_party"] = conv_node(
             "third_party",
-            "The person on the line is NOT the customer {{first_name}} {{last_name}}. Do not say why you are calling. Ask when {{title}} {{last_name}} can be reached.\n"
-            "{{callback_facts}}\n" + (R.get("third_party") or "") + pre_verif +
-            "\nWhen the person names a day and time, call schedule_callback with the date (YYYY-MM-DD) and time (HH:MM).",
-            tools=[callback], transitions=tp_tr, max_turns=20)
+            "The person on the line is NOT the customer {{first_name}} {{last_name}}. Do not say why you are calling. "
+            + ("Ask when {{title}} {{last_name}} can be reached.\n{{callback_facts}}\n" if cb_on else "\n") + (R.get("third_party") or "") + pre_verif +
+            ("\nWhen the person names a day and time, call schedule_callback with the date (YYYY-MM-DD) and time (HH:MM)." if cb_on else "\nDo not arrange a callback."),
+            tools=[callback] if cb_on else [], transitions=tp_tr, max_turns=20)
 
     # -------- identity
     qs = I.get("questions") or []
@@ -403,7 +404,7 @@ def build(spec, openapi):
 def transfer_route(spec, queue):
     reason = ((spec.get("transfer") or {}).get("queue_to_reason") or {}).get(queue, queue)
     rows = [r for r in spec.get("outcomes") or [] if role(r) == "transferred"]
-    match = [r for r in rows if (r.get("reason") or "") == reason] or rows
+    match = [r for r in rows if (r.get("reason") or "") == reason] or [r for r in rows if str(r.get("outcome")) == reason] or rows
     target = end_key(match[0]["outcome"], match[0].get("reason") or "") if match else "finalize"
     return {"target_node": target, "description": f"transfer to {queue} done",
             "condition": cond_eq("transfer_done_queue", queue)}
