@@ -292,7 +292,8 @@ def build(spec, openapi):
         "\nAfter every answer CALL verify_identity with that question's field and the answer exactly as the customer gave it (a date of birth may be sent in any form; it is converted for you). "
         "Then follow what_to_do_next from the result. Never tell the customer an answer is right or wrong before the tool result. "
         "If an answer is clearly incomplete (a date without the year, fewer digits than asked), ask for the missing part first and call verify_identity once with the complete answer. "
-        "As soon as the answer is complete (also when it came in several messages, or together with a question or a complaint), call verify_identity right away, before you say anything else; deal with the question afterwards.\n" +
+        "As soon as the answer is complete (also when it came in several messages, or together with a question or a complaint), call verify_identity right away, before you say anything else; deal with the question afterwards. "
+        "Example: the message '21 July 1990. How' contains a complete date of birth, so call verify_identity with it at once; never answer such a message with 'I'm listening.'\n" +
         (R.get("identity") or "") + pre_verif,
         tools=[verify] + ([transfer] if transfer else []), transitions=id_tr,
         on_enter={"type": "tts", "text": tmpl((L.get("identity_intro") or "") + " " + (qs[0]["ask"] if qs else ""))},
