@@ -1,5 +1,5 @@
 {
-  "description": "Freya Bank voice test environment: synthetic customers (fictional, no real people or cards) and the exact response each statement service returns for them. Shapes follow the 2026-10-01 service contract. Under 'services', services called with a card are keyed by the masked card number from cards.list; statement.week.decide and statement.week.change have a second key, the requested week (newStatementWeek). 'http' is the status code, 'yanit' the response body, 'gecikmeSaniye' (when present) a delay in seconds before answering.",
+  "description": "Freya Bank voice test environment: synthetic customers (fictional, no real people or cards) and the exact response each statement service returns for them. Shapes follow the 2026-10-01 service contract. Under 'services', services called with a card are keyed by the masked card number from cards.list; statement.week.decide and statement.week.change have a second key, the requested week (newStatementWeek). 'http' is the status code, 'response' the response body, 'delaySeconds' (when present) a delay in seconds before answering.",
   "customers": [
     {
       "customerNo": "90000001",

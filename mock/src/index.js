@@ -1,66 +1,79 @@
-// Mock of Freya Bank's statement services (final case). Data-driven: every answer comes from the bank's
-// test-customers.json (status code, body and optional delay), looked up by customer number, card and week.
+// Mock of Freya Bank's statement services for the final case, following the 2026-10-01 service contract and
+// test-environment/test-customers.md: POST <base>/voice/v1/<service>, request {data: {...}, call: {...}},
+// answers served exactly from test-customers.json (status code and body, with the optional delay).
 import DATA from "./test-customers.json";
-
-// Exact paths from the integration document go here; until then the path is matched to a service name loosely.
-const PATHS = {};
 
 const SERVICES = ["cards.list", "cards.balance", "statement.week.get", "statement.week.decide",
                   "statement.week.change", "contact.email.get", "statement.pdf.send"];
-const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+// Contract section 4: the 404 of each service; services without one answer 400 INVALID_ARGUMENTS_ERROR.
+const NOT_FOUND = {
+  "cards.list": ["FB_IVR_CHANNEL_102", "Müşteriye ait geçerli kart bilgisi bulunamadı."],
+  "cards.balance": ["FB_IVR_CHANNEL_120", "Card not found"],
+  "statement.week.get": ["FB_IVR_CHANNEL_121", "Card not found"],
+  "statement.pdf.send": ["FB_IVR_CHANNEL_107", "Pdf dokümanı bulunamadı"],
+};
+const REQUIRED = {
+  "cards.list": ["customerNo"], "cards.balance": ["cardNumber"], "statement.week.get": ["cardNumber"],
+  "statement.week.decide": ["cardNumber", "newStatementWeek"], "statement.week.change": ["cardNumber", "newStatementWeek"],
+  "contact.email.get": ["customerNo"], "statement.pdf.send": ["customerNo", "cardNumber"],
+};
+const FIELD_LABEL = { customerNo: "customer number", cardNumber: "card number", newStatementWeek: "new statement week" };
+
+function guid() { return crypto.randomUUID().replace(/-/g, ""); }
+function errorBody(httpStatus, code, message, type) {
+  const g = guid();
+  return [{ result: { guid: g, returnCode: code, messageText: message, code, message, type,
+            details: { guid: g, rootCause: httpStatus >= 500 ? "TechnicalError" : "BusinessError", errorOrigin: "freya-final-mock" } } }, httpStatus];
+}
+function notFound(svc) {
+  if (NOT_FOUND[svc]) return errorBody(404, NOT_FOUND[svc][0], NOT_FOUND[svc][1], "WARNING");
+  return errorBody(400, "INVALID_ARGUMENTS_ERROR", "invalid arguments", "ERROR");
+}
+
+const sleep = (s) => new Promise((r) => setTimeout(r, Number(s) * 1000));
+const CARD_OWNER = {};
+for (const c of DATA.customers) for (const v of Object.values(c.services))
+  if (v && typeof v === "object" && v.http === undefined) for (const card of Object.keys(v)) CARD_OWNER[card] = c;
 
 function serviceFor(path) {
-  if (PATHS[path]) return PATHS[path];
-  const p = norm(path.replace(/^\/+(api\/)?(v\d+\/)?/i, ""));
-  return SERVICES.find((s) => norm(s) === p) || SERVICES.find((s) => p.endsWith(norm(s))) ||
-         SERVICES.find((s) => p.includes(norm(s)));
+  const last = decodeURIComponent(path.split("/").filter(Boolean).pop() || "");
+  if (SERVICES.includes(last)) return last;
+  const n = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const p = n(path.replace(/^\/+(voice\/)?(v\d+\/)?/i, ""));
+  return SERVICES.find((s) => n(s) === p) || SERVICES.find((s) => p.endsWith(n(s)));
 }
 
-function pick(obj, names) {
-  for (const n of names) {
-    for (const k of Object.keys(obj || {})) if (k.toLowerCase() === n.toLowerCase() && obj[k] !== undefined && obj[k] !== "") return obj[k];
+async function answer(svc, d) {
+  for (const f of REQUIRED[svc] || []) {
+    if (d[f] === undefined || d[f] === null || String(d[f]).trim() === "")
+      return errorBody(400, "INVALID_ARGUMENTS_ERROR", `${FIELD_LABEL[f] || f} cannot be empty`, "ERROR");
   }
-  return undefined;
+  let entry;
+  if (["cards.list", "contact.email.get", "statement.pdf.send"].includes(svc)) {
+    const cust = DATA.customers.find((c) => c.customerNo === String(d.customerNo).trim());
+    entry = cust && cust.services[svc];
+  } else {
+    const card = String(d.cardNumber).trim();
+    const cust = CARD_OWNER[card];
+    entry = cust && cust.services[svc] && cust.services[svc][card];
+    if (entry && entry.http === undefined) entry = entry[String(d.newStatementWeek).trim()];
+  }
+  if (!entry || entry.http === undefined) return notFound(svc);
+  const delay = entry.delaySeconds ?? entry.gecikmeSaniye;
+  if (delay) await sleep(delay);
+  return [entry.response ?? entry.yanit ?? {}, entry.http];
 }
-
-function cardEntry(table, card) {
-  if (!table) return undefined;
-  if (table[card]) return table[card];
-  const digits = String(card || "").replace(/\D/g, "");
-  const keys = Object.keys(table);
-  const byLast = keys.filter((k) => digits && k.replace(/\D/g, "").slice(-4) === digits.slice(-4));
-  const exact = keys.find((k) => k.replace(/\*/g, "") && digits.endsWith(k.replace(/\D/g, "").slice(-4)) && digits.startsWith(k.replace(/\D/g, "").slice(0, 6)));
-  if (exact) return table[exact];
-  if (byLast.length === 1) return table[byLast[0]];
-  if (keys.length === 1 && !card) return table[keys[0]];
-  return undefined;
-}
-
-const sleep = (s) => new Promise((r) => setTimeout(r, Math.min(Number(s) || 0, 25) * 1000));
 
 export default {
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === "/health") return Response.json({ ok: true, customers: DATA.customers.length });
-    let body = {};
-    if (request.method !== "GET") { try { body = await request.json(); } catch (e) { body = {}; } }
-    const q = Object.fromEntries(url.searchParams);
-    const args = { ...q, ...(body && typeof body === "object" ? body : {}) };
     const svc = serviceFor(url.pathname);
-    if (!svc) return Response.json({ error: "unknown service", path: url.pathname }, { status: 404 });
-    const cno = String(pick(args, ["customerNo", "customerNumber", "musteriNo", "customerId"]) || "").replace(/\D/g, "");
-    const cust = DATA.customers.find((c) => c.customerNo === cno);
-    if (!cust) return Response.json({ data: null, result: { returnCode: "0", code: "0", message: "Customer not found", messageText: "Customer not found" } }, { status: 404 });
-    let entry = cust.services[svc];
-    if (entry && entry.http === undefined) {          // keyed by card
-      entry = cardEntry(entry, pick(args, ["cardNumber", "kartNo", "cardNo", "card"]));
-      if (entry && entry.http === undefined) {        // keyed by requested week
-        const wk = String(pick(args, ["newStatementWeek", "statementWeek", "week"]) ?? "");
-        entry = entry[wk] || (Object.keys(entry).length === 1 ? Object.values(entry)[0] : undefined);
-      }
-    }
-    if (!entry) return Response.json({ data: null, result: { returnCode: "0", code: "0", message: "No test data for this request", messageText: "No test data for this request" } }, { status: 404 });
-    if (entry.gecikmeSaniye) await sleep(entry.gecikmeSaniye);
-    return Response.json(entry.response ?? entry.yanit ?? {}, { status: entry.http || 200 });
+    if (!svc) return Response.json(...errorBody(404, "NOT_FOUND", `unknown service ${url.pathname}`, "ERROR").map((x, i) => (i ? { status: x } : x)));
+    let body = {};
+    try { body = await request.json(); } catch (e) { body = {}; }
+    const d = (body && typeof body.data === "object" && body.data) ? body.data : (body || {});   // tolerate a missing envelope
+    const [out, status] = await answer(svc, d);
+    return Response.json(out, { status });
   },
 };
