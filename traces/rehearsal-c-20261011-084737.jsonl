@@ -1,0 +1,14 @@
+{"t": 0.1, "event": "start", "at": "2026-10-11T08:47:37+0300"}
+{"t": 0.1, "event": "inputs", "briefs": ["fixtures/fake/brief-c-raw.md"], "openapi": "fixtures/fake/openapi-c.json", "slot": "rehearsal-c"}
+{"t": 80.8, "event": "model_call", "model": "claude-opus-5-5", "purpose": "extract the SPEC from the brief", "input_tokens": 17, "output_tokens": 9785}
+{"t": 98.8, "event": "model_call", "model": "claude-opus-5-5", "purpose": "coverage review of the SPEC (returns corrections only)", "input_tokens": 5436, "output_tokens": 1852}
+{"t": 98.8, "event": "review_corrections", "applied": 0, "paths": []}
+{"t": 98.8, "event": "spec_check", "attempt": 0, "problems": []}
+{"t": 98.9, "event": "spec_written", "path": "out/rehearsal-c.spec.json", "outcomes": 16}
+{"t": 98.9, "event": "workflow_generated", "nodes": 26, "bytes": 313573}
+{"t": 99.6, "event": "dry_run_ok"}
+{"t": 101.0, "event": "saved_on_freya", "workflow_id": "69317fdd-0062-4a81-b86d-1c700fefb4bc", "agent_id": "35abc96f-0a40-4b2c-9412-ace55d1fb3c0"}
+{"t": 104.6, "event": "agent_config_tuned", "wait_seconds": 4.0, "language": "en", "version": 2}
+{"t": 112.2, "event": "self_test_chat_turn", "ok": true, "agent_said": "Hello, this is the automated assistant of NordLicht Kredit. We record this call for quality purposes. May I speak with Alex Morgan?"}
+{"t": 113.2, "event": "exported", "path": "/Users/ayazelrico/Desktop/FREYA AI VOICE HACKHATON/build-the-builder/out/rehearsal-c.export.workflow.json"}
+{"t": 113.2, "event": "end", "at": "2026-10-11T08:49:30+0300", "seconds": 113, "slot": "rehearsal-c"}

@@ -101,7 +101,8 @@ Kapasite: aynı anda 1 simülasyon, 10 case = 3–11 dk. Önce sadece fail eden 
    ```
    Çıktılar: `out/final-N.export.workflow.json` (submit edilecek), `traces/final-N-<zaman>.jsonl` (submit edilecek).
 3. Çökme olursa: sadece parser/crash düzelt. Final brief'ten **hiçbir değer, kural, isim** koda/prompta girmez. Sonra builder'ı baştan çalıştır.
-4. `git add out/final-* traces/final-* && git commit && git push` → commit hash'ini al.
+4. `git add -f out/final-* finals/ && git add traces/final-* && git commit -m "Final builds" && git push` → `git rev-parse HEAD` ile commit hash'ini al.
+   (Prova: sahte brief C'de uçtan uca 113 sn, export tur alma ayarlarını içeriyor.)
 5. Submit: takım (solo), repo linki, commit hash, iki export dosyası, iki trace.
 
 ## 9. Durum (Cmt 21:45)
