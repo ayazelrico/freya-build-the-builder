@@ -251,7 +251,7 @@ def build(spec, openapi):
         "\nThe customer's full name: {{first_name}} {{last_name}}. Address them as {{title}} {{last_name}}.",
         tools=opening_tools, transitions=opening_tr,
         on_enter={"type": "tts", "text": tmpl(no_recorded(L.get("opening") or "") + " " + (L.get("confirm_identity") or "Am I speaking with {title} {last_name}?"))},
-        max_turns=8, max_target=key_for("unclear"))
+        max_turns=14, max_target=key_for("unclear"))
 
     # -------- third party
     if third_rows and callback:
@@ -263,7 +263,7 @@ def build(spec, openapi):
             "The person on the line is NOT the customer {{first_name}} {{last_name}}. Do not say why you are calling. Ask when {{title}} {{last_name}} can be reached.\n"
             "{{callback_facts}}\n" + (R.get("third_party") or "") + pre_verif +
             "\nWhen the person names a day and time, call schedule_callback with the date (YYYY-MM-DD) and time (HH:MM).",
-            tools=[callback], transitions=tp_tr, max_turns=12)
+            tools=[callback], transitions=tp_tr, max_turns=20)
 
     # -------- identity
     qs = I.get("questions") or []
@@ -292,7 +292,7 @@ def build(spec, openapi):
         (R.get("identity") or "") + pre_verif,
         tools=[verify] + ([transfer] if transfer else []), transitions=id_tr,
         on_enter={"type": "tts", "text": tmpl((L.get("identity_intro") or "") + " " + (qs[0]["ask"] if qs else ""))},
-        max_turns=20, max_target=key_for("id_declined"))
+        max_turns=40, max_target=key_for("id_declined"))
 
     # -------- account
     acc = spec.get("account") or {}
@@ -345,7 +345,7 @@ def build(spec, openapi):
         "When the call should end, call the matching end tool. Do not end after a recorded promise yourself; that happens automatically.",
         tools=neg_tools, transitions=neg_tr,
         on_enter={"type": "tts", "text": "{{debt_statement}}"},
-        max_turns=60, max_target=key_for("refused"))
+        max_turns=90, max_target=key_for("refused"))
 
     # -------- ends
     for r in spec.get("outcomes") or []:

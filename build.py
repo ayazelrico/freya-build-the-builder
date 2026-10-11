@@ -22,7 +22,7 @@ def tune_agent_config(workflow_id, spec, trace):
     the caller pauses) cuts talkative callers off mid-sentence, and its speech language defaults to Turkish.
     Give callers time to finish and match the brief's language. The model is left exactly as it is."""
     try:
-        wait = float(os.environ.get("TURN_WAIT_SECONDS", "2.5"))
+        wait = float(os.environ.get("TURN_WAIT_SECONDS", "4.0"))
         w = freya.api("GET", f"/api/v2/workflow/{workflow_id}", workspaceId=freya.workspace_id())["workflow"]["workflow"]
         ac = w.get("agent_config") or {}
         tts = ac.setdefault("ttsConfig", {}); stt = ac.setdefault("sttConfig", {})

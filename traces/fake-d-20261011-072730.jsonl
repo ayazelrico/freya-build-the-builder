@@ -1,0 +1,11 @@
+{"t": 0.0, "event": "start", "at": "2026-10-11T07:27:30+0300"}
+{"t": 0.0, "event": "inputs", "briefs": ["fixtures/fake/brief-d-clean.md"], "openapi": "fixtures/fake/openapi-d.json", "slot": "fake-d"}
+{"t": 0.0, "event": "spec_loaded", "path": "out/fake-d.spec.json"}
+{"t": 0.0, "event": "spec_written", "path": "out/fake-d.spec.json", "outcomes": 14}
+{"t": 0.0, "event": "workflow_generated", "nodes": 24, "bytes": 311718}
+{"t": 0.8, "event": "dry_run_ok"}
+{"t": 2.2, "event": "saved_on_freya", "workflow_id": "6af36315-3fde-4153-8e11-2488e90975fd", "agent_id": "2220e20f-6a77-4427-a325-749d5b45cac8"}
+{"t": 5.1, "event": "agent_config_tuned", "wait_seconds": 2.5, "language": "en", "version": 2}
+{"t": 6.7, "event": "self_test_chat_turn", "ok": true, "agent_said": "Hi, this is Harbor Credit Union's virtual assistant. Is this Mr Morgan?"}
+{"t": 8.1, "event": "exported", "path": "/Users/ayazelrico/Desktop/FREYA AI VOICE HACKHATON/build-the-builder/out/fake-d.export.workflow.json"}
+{"t": 8.1, "event": "end", "at": "2026-10-11T07:27:38+0300", "seconds": 8, "slot": "fake-d"}
